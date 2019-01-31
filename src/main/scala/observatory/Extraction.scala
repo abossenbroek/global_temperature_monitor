@@ -248,9 +248,9 @@ object Extraction {
 //        .collect().toSeq
 //    }
 
-      val rdd = spark.sparkContext.parallelize(records.map{r => (r._2.lon, r._2.lat, r._3.toDouble)}.toSeq)
-      val latLonAvg = rdd.toDF("lon", "lat", "temp").groupBy('lon, 'lat)
-        .agg(avg('temp)).as("temp")
+    val rdd = spark.sparkContext.parallelize(records.map{r => (r._2.lon, r._2.lat, r._3.toDouble)}.toSeq)
+    val latLonAvg = rdd.toDF("lon", "lat", "temp").groupBy('lon, 'lat)
+      .agg(avg('temp)).as("temp")
 
     latLonAvg.rdd.map(r => (r.getDouble(0), r.getDouble(1), r.getDouble(2))).collect().toSeq
   }
