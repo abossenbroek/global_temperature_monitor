@@ -30,7 +30,8 @@ libraryDependencies ++= Seq(
   "junit" % "junit" % "4.10" % Test,
   // Logger
   "org.apache.logging.log4j" % "log4j-core" % "2.11.1",
-  "org.apache.logging.log4j" % "log4j-api" % "2.11.1"
+  "org.apache.logging.log4j" % "log4j-api" % "2.11.1",
+  "com.storm-enroute" %% "scalameter-core" % "0.8.2"
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"
