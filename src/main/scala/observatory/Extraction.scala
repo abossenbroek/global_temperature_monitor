@@ -16,15 +16,14 @@ import scala.reflect.runtime.universe.TypeTag
 object Extraction {
 
   import org.apache.spark.sql.SparkSession
-  import org.apache.spark.sql.functions._
 
   val spark: SparkSession =
     SparkSession
       .builder()
       .appName("Global temperature loader")
       .config("spark.master", "local")
-      .config("spark.driver.memory", "1600m")
-      .config("spark.executor.memory", "1600m")
+      .config("spark.driver.memory", "1600M")
+      .config("spark.executor.memory", "1600M")
       .getOrCreate()
 
   // For implicit conversions like converting RDDs to DataFrames
@@ -111,8 +110,7 @@ object Extraction {
                                   wbanIden: Option[Long],
                                   month: Int,
                                   day: Int,
-                                  temp: Temperature,
-                                  year: Int
+                                  temp: Temperature
                                 )
 
   /**
@@ -156,19 +154,20 @@ object Extraction {
     * @param stationsFile The csv file that contains station information
     * @return Dataset of station information
     */
-  def loadStationData(stationsFile: String): Dataset[StationData] = {
-    import org.apache.spark.sql.expressions.scalalang.typed._
+  def loadStationData(stationsFile: String): DataFrame = {
+    //import org.apache.spark.sql.expressions.scalalang.typed._
+    import org.apache.spark.sql.functions._
 
     val stationData = readCsv[StationData](stationsFile)
     val cleanedStationData = stationData.filter($"lat".isNotNull && $"lon".isNotNull)
 
-    cleanedStationData.groupByKey(row => (row.stnIden, row.wbanIden))
+    cleanedStationData.toDF("stnIden", "wbanIden", "lat", "lon")
+      .na.fill(0, Seq("stnIden", "wbanIden"))
+      .withColumn("joinKeyStation", 'stnIden * 10000 + 'wbanIden)
+      .groupBy('joinKeyStation)
       .agg(
-        avg(_.lat),
-        avg(_.lon))
-      .map { case ((stnIden, wbanIden), lat, lon) =>
-        StationData(stnIden, wbanIden, lat, lon)
-      }.orderBy('stnIden)
+        avg('lat).as("lat"),
+        avg('lon).as("lon"))
   }
 
   /**
@@ -179,23 +178,23 @@ object Extraction {
     * @param temperaturesFile The csv files that should be loaded for temperature measurements
     * @return A dataset of temperature measurements where temperatures are measured in Celsius
     */
-  def loadTemperatures(year: Year, temperaturesFile: String): Dataset[TemperatureYearData] = {
-    import org.apache.spark.sql.expressions.scalalang.typed._
+  def loadTemperatures(temperaturesFile: String): DataFrame = {
+    import org.apache.spark.sql.functions._
 
     def f2c(f: Double): Double = (f - 32f) * 5f / 9f
 
     val temperatureData = readCsv[TemperatureData](temperaturesFile)
-      .withColumn("year", lit(year))
       .as[TemperatureYearData]
-      .repartition(12)
 
-    temperatureData.groupByKey(row => (row.stnIden, row.wbanIden, row.month, row.day, row.year))
+    temperatureData.toDF()
+      .na.fill(0, Seq("stnIden", "wbanIden"))
+      .withColumn("joinKeyWeather", 'stnIden * 10000 + 'wbanIden)
+      .groupBy('joinKeyWeather, 'month, 'day)
       .agg(
-        avg(_.temp)
+        avg('temp).as("temp")
       )
-      .map { case ((stnIden, wbanIden, month, day, y), temperature) =>
-      TemperatureYearData(stnIden, wbanIden, month, day, f2c(temperature), y)
-    }.orderBy('stnIden)
+      .withColumn("temp_celsius", ('temp - 32f) * 5f / 9f)
+      .drop('temp)
   }
 
   /**
@@ -207,19 +206,13 @@ object Extraction {
     * @param temperaturesFile The file(s) that contain(s) data on the temperature (in Fahrenheit)
     * @return Dataset of temperature measurements with lat, lon of each measurement and temperature in Celsius
     */
-  def readMeasurements(year: Year, stationsFile: String, temperaturesFile: String): Dataset[SparkMeasurement] = {
-    val stationDs = loadStationData(stationsFile).na.fill(0, Seq("stnIden"))
-      .na.fill(0, Seq("wbanIden"))
-    val tempDs = loadTemperatures(year, temperaturesFile).na.fill(0, Seq("stnIden"))
-      .na.fill(0, Seq("wbanIden"))
+  def readMeasurements(stationsFile: String, temperaturesFile: String): DataFrame = {
+    val stationDs = loadStationData(stationsFile)
+    val tempDs = loadTemperatures(temperaturesFile)
 
-    val tempLocDs = tempDs.join(stationDs, tempDs("wbanIden") === stationDs("wbanIden") &&
-      tempDs("stnIden") === stationDs("stnIden")
-    ).drop("stnIden").drop("wbanIden").as[RawMeasurement]
-
-    tempLocDs.map { r =>
-      SparkMeasurement(Date.valueOf(LocalDate.of(r.year, r.month, r.day)), r.lat, r.lon, r.temp)
-    }
+    tempDs
+      .join(stationDs, 'joinKeyStation === 'joinKeyWeather)
+      .drop("joinKeyStation", "joinKeyWeather")
   }
 
   /**
@@ -229,8 +222,9 @@ object Extraction {
     * @return A sequence containing triplets (date, location, temperature)
     */
   def locateTemperatures(year: Year, stationsFile: String, temperaturesFile: String): Iterable[(LocalDate, Location, Temperature)] = {
-    readMeasurements(year, stationsFile, temperaturesFile).rdd.
-      map(r => (r.date.toLocalDate, Location(r.lat, r.lon), r.temp)).collect().toSeq
+    readMeasurements(stationsFile, temperaturesFile).rdd.map(row => {
+      (LocalDate.of(year, row.getInt(0), row.getInt(1)), Location(row.getDouble(3), row.getDouble(4)), row.getDouble(2))
+    }).collect.toSeq
   }
 
   /**
@@ -238,27 +232,14 @@ object Extraction {
     * @return A sequence containing, for each location, the average temperature over the year.
     */
   def locationYearlyAverageRecords(records: Iterable[(LocalDate, Location, Temperature)]): Iterable[(Location, Temperature)] = {
-    // Tested the performance of entire operation in RDD versus Dataframe
-    // The performance results were:
-    //    - RDD time taken:  9104.672457 ms
-    //    - DF time taken:   7823.963467 ms
-
-    //    val executionTimeRDD = withWarmer(new Warmer.Default) measure {
-    //      val rdd = spark.sparkContext.parallelize(records.toSeq)
-    //      val latLonAvg = rdd
-    //        .map(r => (r._2, r._3))
-    //        .aggregateByKey((0.0d, 0.0d))(
-    //          (acc, value) => (acc._1 + value, acc._2 + 1f),
-    //          (acc1, acc2) => (acc1._1 + acc2._1, acc1._2 + acc2._2))
-    //        .mapValues(sumCount => sumCount._1 / sumCount._2)
-    //        .collect().toSeq
-    //    }
-
-    val rdd = spark.sparkContext.parallelize(records.map { r => (r._2.lat, r._2.lon, r._3.toDouble) }.toSeq)
-    val latLonAvg = rdd.toDF("lat", "lon", "temp").groupBy('lat, 'lon)
-      .agg(avg('temp)).as("temp")
-
-    latLonAvg.rdd.map(r => (Location(r.getDouble(0), r.getDouble(1)), r.getDouble(2))).collect().toSeq
+    records
+      .par
+      .groupBy(_._2)
+      .mapValues(
+        locationData => locationData.foldLeft(0d)(
+          (sum, row) => sum + row._3
+        ) / locationData.size
+      ).seq
   }
 
 }
