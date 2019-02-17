@@ -213,6 +213,7 @@ object Extraction {
     tempDs
       .join(stationDs, 'joinKeyStation === 'joinKeyWeather)
       .drop("joinKeyStation", "joinKeyWeather")
+      .filter($"temp_celsius".isNotNull)
   }
 
   /**
