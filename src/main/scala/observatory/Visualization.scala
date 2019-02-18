@@ -1,8 +1,6 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
-import org.scalameter
-import org.scalameter._
 
 import scala.collection.immutable.TreeMap
 
@@ -106,36 +104,37 @@ object Visualization {
     val width = 360
     val height = 180
 
-    val parallelTime = config(
-      Key.exec.benchRuns -> 10,
-      Key.verbose -> true
-    ) withWarmer(new scalameter.Warmer.Default) measure {
-      val worldCoords = for{lon <- -89 to 90; lat <- -180 to 179}
-        yield {(lon, lat)}
-      val worldColors = (worldCoords.indices zip worldCoords).par.toMap.mapValues{case(lat, lon) => {
-        val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
-        Pixel(PixelTools.rgb(col.red, col.green, col.blue))
-      }}
-      val imgArray = worldColors.toVector.sortBy(_._1).map{_._2}
-    }
-
-    println(s"For parallel approach found time\t\t$parallelTime")
-
-    val naiveTime = config(
-      Key.exec.benchRuns -> 10,
-      Key.verbose -> true
-    ) withWarmer(new scalameter.Warmer.Default) measure {
-      val interPolated = (for {lon <- -89 to 90; lat <- -180 to 179}
+//    val parallelTime = config(
+//      Key.exec.benchRuns -> 10,
+//      Key.verbose -> true
+//    ) withWarmer(new scalameter.Warmer.Default) measure {
+//      val worldCoords = for{lon <- -89 to 90; lat <- -180 to 179}
+//        yield {(lon, lat)}
+//      val worldColors = (worldCoords.indices zip worldCoords).par.toMap.mapValues{case(lat, lon) => {
+//        val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
+//        Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+//      }}
+//      val imgArray = worldColors.toVector.sortBy(_._1).map{_._2}
+//    }
+//
+//    println(s"For parallel approach found time\t\t$parallelTime")
+//
+//    val naiveTime = config(
+//      Key.exec.benchRuns -> 10,
+//      Key.verbose -> true
+//    ) withWarmer(new scalameter.Warmer.Default) measure {
+      val interpolated = (for {lon <- -89 to 90; lat <- -180 to 179}
         yield {
           val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
           Pixel(PixelTools.rgb(col.red, col.green, col.blue))
         }).toArray
-    }
-    println(s"For naive approach found time\t\t$naiveTime")
+//    }
+//    println(s"For naive approach found time\t\t$naiveTime")
 
 
 
-    Image(width, height, Array(Pixel(0), Pixel(0)))
+    //Image(width, height, Array(Pixel(0), Pixel(0)))
+    Image(width, height, interpolated)
   }
 
 }
