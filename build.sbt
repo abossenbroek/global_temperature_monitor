@@ -31,7 +31,9 @@ libraryDependencies ++= Seq(
   // Logger
   "org.apache.logging.log4j" % "log4j-core" % "2.11.1",
   "org.apache.logging.log4j" % "log4j-api" % "2.11.1",
-  "com.storm-enroute" %% "scalameter-core" % "0.8.2"
+  "com.storm-enroute" %% "scalameter-core" % "0.8.2",
+  "ch.qos.logback" % "logback-classic" % "1.2.3",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.2"
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"

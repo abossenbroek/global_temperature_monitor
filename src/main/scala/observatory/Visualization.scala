@@ -1,6 +1,8 @@
 package observatory
 
-import com.sksamuel.scrimage.{Image, Pixel}
+import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
+import org.scalameter
+import org.scalameter._
 
 import scala.collection.immutable.TreeMap
 
@@ -15,8 +17,6 @@ object Visualization {
     * @return The predicted temperature at `location`
     */
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
-    // TODO: first determine whether our location is within 1km range of any point in the set
-
     // Based on https://gis.stackexchange.com/questions/142326/calculating-longitude-length-in-miles
     val kmPerDegree = 111d
 
@@ -43,9 +43,9 @@ object Visualization {
             + math.cos(math.toRadians(a.lat)) * math.cos(math.toRadians(location.lat)) * math.cos(absDiffLon))
         }
 
-      assert(greatCircle(location) < 1e-6)
-      assert((greatCircle(Location(-location.lat, -location.lon)) - math.Pi).abs < 1e-6)
-      assert((greatCircle(Location(location.lat, -location.lon)) - math.Pi).abs > 1e-6)
+//      assert(greatCircle(location) < 1e-6)
+//      assert((greatCircle(Location(-location.lat, -location.lon)) - math.Pi).abs < 1e-6)
+//      assert((greatCircle(Location(location.lat, -location.lon)) - math.Pi).abs > 1e-6)
 
       def distance(a: Location, p: Double = 1.5) = math.pow(earthRadius * greatCircle(a), -p)
 
@@ -105,8 +105,37 @@ object Visualization {
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
     val width = 360
     val height = 180
-    val output = Array[Pixel](width * height)
-    Image(width, height, output)
+
+    val parallelTime = config(
+      Key.exec.benchRuns -> 10,
+      Key.verbose -> true
+    ) withWarmer(new scalameter.Warmer.Default) measure {
+      val worldCoords = for{lon <- -89 to 90; lat <- -180 to 179}
+        yield {(lon, lat)}
+      val worldColors = (worldCoords.indices zip worldCoords).par.toMap.mapValues{case(lat, lon) => {
+        val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
+        Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+      }}
+      val imgArray = worldColors.toVector.sortBy(_._1).map{_._2}
+    }
+
+    println(s"For parallel approach found time\t\t$parallelTime")
+
+    val naiveTime = config(
+      Key.exec.benchRuns -> 10,
+      Key.verbose -> true
+    ) withWarmer(new scalameter.Warmer.Default) measure {
+      val interPolated = (for {lon <- -89 to 90; lat <- -180 to 179}
+        yield {
+          val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
+          Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+        }).toArray
+    }
+    println(s"For naive approach found time\t\t$naiveTime")
+
+
+
+    Image(width, height, Array(Pixel(0), Pixel(0)))
   }
 
 }
