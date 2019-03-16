@@ -37,7 +37,11 @@ libraryDependencies ++= Seq(
   "com.storm-enroute" %% "scalameter-core" % "0.8.2",
 
   // Pickling
-  "org.scala-lang.modules" %% "scala-pickling" % "0.10.1"
+  "org.scala-lang.modules" %% "scala-pickling" % "0.10.1",
+
+  // Fastmath
+  "org.apache.commons" % "commons-math3" % "3.6.1"
+
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"
