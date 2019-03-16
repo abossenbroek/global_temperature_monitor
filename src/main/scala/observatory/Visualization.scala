@@ -18,13 +18,14 @@ object Visualization {
     // Based on https://gis.stackexchange.com/questions/142326/calculating-longitude-length-in-miles
     val kmPerDegree = 111d
 
+    // TODO: optimize!
     def euclideanDistance(a: Location): Double = {
       math.sqrt((a.lon - location.lon) * (a.lon - location.lon) + (a.lat - location.lat) * (a.lat - location.lat))
     }
 
     val euclidianDistances = temperatures
       .par
-      .foldLeft(Map[Double, Temperature]())((map, key) => map + (euclideanDistance(key._1) -> key._2))
+      .map{case (l, t) => euclideanDistance(l) -> t}.toMap
 
     if (euclidianDistances.keys.min < 1 / kmPerDegree) {
       euclidianDistances(euclidianDistances.keys.min)
@@ -37,17 +38,14 @@ object Visualization {
         else {
           val absDiffLon = (math.toRadians(a.lon) - math.toRadians(location.lon)).abs
 
+          // TODO: optimize! Check apache fast math
           math.acos(math.sin(math.toRadians(a.lat)) * math.sin(math.toRadians(location.lat))
             + math.cos(math.toRadians(a.lat)) * math.cos(math.toRadians(location.lat)) * math.cos(absDiffLon))
         }
 
-//      assert(greatCircle(location) < 1e-6)
-//      assert((greatCircle(Location(-location.lat, -location.lon)) - math.Pi).abs < 1e-6)
-//      assert((greatCircle(Location(location.lat, -location.lon)) - math.Pi).abs > 1e-6)
-
       def distance(a: Location, p: Double = 1.5) = math.pow(earthRadius * greatCircle(a), -p)
 
-      val weights = temperatures.par.foldLeft(Map[Double, Temperature]())((map, key) => map + (distance(key._1) -> key._2))
+      val weights = temperatures.par.map{case (l, t) => distance(l) -> t}
 
       val weigthNumerator = weights.par.foldLeft(0d)((acc, key) => acc + key._1 * key._2)
       val weigthDenum = weights.par.foldLeft(0d)((acc, key) => acc + key._1)
@@ -78,9 +76,43 @@ object Visualization {
       Color(redComp, greenComp, blueComp)
     }
 
-    val scale = points.toSeq.par
+    val scale = calculateScale(points)
+
+    if (value >= scale.keys.max) {
+      scale(scale.keys.max)
+    } else if (value <= scale.keys.min) {
+      scale(scale.keys.min)
+    } else {
+      val closest = Seq(scale.to(value).lastOption, scale.from(value).headOption)
+        .flatten
+        .distinct
+
+      interpolator(closest.head, closest.tail.head, value)
+    }
+  }
+
+  def calculateScale(points: Iterable[(Temperature, Color)]): TreeMap[Temperature, Color] = {
+    points.toSeq.par
         .foldLeft(TreeMap[Temperature, Color]())((map, key) =>
           map + (key._1 -> key._2))
+  }
+
+  def interpolateColorWithScale(scale: TreeMap[Temperature, Color], value: Temperature): Color = {
+    def interpolator(color1: (Temperature, Color), color2: (Temperature, Color), toInterpolate: Temperature): Color = {
+      def linearInterpolation(y0: Int, y1: Int): Int = {
+        val x0 = color1._1
+        val x1 = color2._1
+
+        val scale = (toInterpolate - x0) / (x1 - x0).toFloat
+        (y0 * (1f - scale) + y1 * scale).round.toInt
+      }
+
+      val redComp = linearInterpolation(color1._2.red, color2._2.red)
+      val greenComp = linearInterpolation(color1._2.green, color2._2.green)
+      val blueComp = linearInterpolation(color1._2.blue, color2._2.blue)
+
+      Color(redComp, greenComp, blueComp)
+    }
 
     if (value >= scale.keys.max) {
       scale(scale.keys.max)
@@ -101,40 +133,52 @@ object Visualization {
     * @return A 360×180 image where each pixel shows the predicted temperature at its location
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
+
+    // BASE START:                          Total time: 6089.689545249999 ms
+    // Taking out calculating the scale:    Total time: 5097.940386700001 ms
+
+
+    // TODO: since we know the level of granularity that an image can have we can reduce the complexity of the problem
+    // by rounding the location to the smallest level of granularity supported by the current image.
+    // Once the rounding is performed we can do calculate the average temperature before continuing.
+
+    val tempScale = calculateScale(colors)
+
+    def worldCoordinates(i: Int): (Int, Int) = {
+      val floored = math.floor(i / 360f).toInt
+      val lon = i - 360 * floored - 180
+      val lat = 90 - floored
+      (lat, lon)}
+
     val width = 360
     val height = 180
 
-//    val parallelTime = config(
-//      Key.exec.benchRuns -> 10,
-//      Key.verbose -> true
-//    ) withWarmer(new scalameter.Warmer.Default) measure {
-//      val worldCoords = for{lon <- -89 to 90; lat <- -180 to 179}
-//        yield {(lon, lat)}
-//      val worldColors = (worldCoords.indices zip worldCoords).par.toMap.mapValues{case(lat, lon) => {
-//        val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
-//        Pixel(PixelTools.rgb(col.red, col.green, col.blue))
-//      }}
-//      val imgArray = worldColors.toVector.sortBy(_._1).map{_._2}
-//    }
+    val worldCoords = 0 until (width * height)
 //
-//    println(s"For parallel approach found time\t\t$parallelTime")
+//    val worldTemperatures = worldCoords.par.map{ i => {
+//      val (lat, lon) = worldCoordinates(i)
+//      val loc = Location(lat, lon)
+//      val temp = predictTemperature(temperatures, loc)
+//      loc -> temp
+//    }}.toMap
 //
-//    val naiveTime = config(
-//      Key.exec.benchRuns -> 10,
-//      Key.verbose -> true
-//    ) withWarmer(new scalameter.Warmer.Default) measure {
-      val interpolated = (for {lon <- -89 to 90; lat <- -180 to 179}
-        yield {
-          val col = interpolateColor(colors, predictTemperature(temperatures, Location(lat, lon)))
-          Pixel(PixelTools.rgb(col.red, col.green, col.blue))
-        }).toArray
-//    }
-//    println(s"For naive approach found time\t\t$naiveTime")
+//    val worldColors = worldCoords.par.map{i => {
+//      val (lat, lon) = worldCoordinates(i)
+//      val loc = Location(lat, lon)
+//      val col = interpolateColor(colors, worldTemperatures(loc))
+//      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+//    }}
 
+    val worldColors = worldCoords.par.map{i => {
+      val (lat, lon) = worldCoordinates(i)
+      val col = interpolateColorWithScale(tempScale, predictTemperature(temperatures, Location(lat, lon)))
+      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+    }}
+    val imgArray = worldColors.toArray
 
-
-    //Image(width, height, Array(Pixel(0), Pixel(0)))
-    Image(width, height, interpolated)
+    val img = Image(width, height, imgArray)
+//    img.output(new java.io.File("target/some-image.png"))
+    img
   }
 
 }
