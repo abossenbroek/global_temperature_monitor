@@ -31,8 +31,13 @@ libraryDependencies ++= Seq(
   // Logger
   "org.apache.logging.log4j" % "log4j-core" % "2.11.1",
   "org.apache.logging.log4j" % "log4j-api" % "2.11.1",
+  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
+
+  // Benchmarking
   "com.storm-enroute" %% "scalameter-core" % "0.8.2",
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0"
+
+  // Pickling
+  "org.scala-lang.modules" %% "scala-pickling" % "0.10.1"
 )
 
 courseId := "PCO2sYdDEeW0iQ6RUMSWEQ"
