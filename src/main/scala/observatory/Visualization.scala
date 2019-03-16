@@ -1,6 +1,7 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
+import org.apache.commons.math3.util.FastMath
 
 import scala.collection.immutable.TreeMap
 
@@ -8,7 +9,6 @@ import scala.collection.immutable.TreeMap
   * 2nd milestone: basic visualization
   */
 object Visualization {
-
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
     * @param location Location where to predict the temperature
@@ -18,17 +18,16 @@ object Visualization {
     // Based on https://gis.stackexchange.com/questions/142326/calculating-longitude-length-in-miles
     val kmPerDegree = 111d
 
-    // TODO: optimize!
-    def euclideanDistance(a: Location): Double = {
-      math.sqrt((a.lon - location.lon) * (a.lon - location.lon) + (a.lat - location.lat) * (a.lat - location.lat))
+    def squaredEuclideanDistance(a: Location): Double = {
+      (a.lon - location.lon) * (a.lon - location.lon) + (a.lat - location.lat) * (a.lat - location.lat)
     }
 
-    val euclidianDistances = temperatures
+    val squaredEuclidianDistances = temperatures
       .par
-      .map{case (l, t) => euclideanDistance(l) -> t}.toMap
+      .map{case (l, t) => squaredEuclideanDistance(l) -> t}.toMap
 
-    if (euclidianDistances.keys.min < 1 / kmPerDegree) {
-      euclidianDistances(euclidianDistances.keys.min)
+    if (squaredEuclidianDistances.keys.min < (1.0 / (kmPerDegree * kmPerDegree))) {
+      squaredEuclidianDistances(squaredEuclidianDistances.keys.min)
     } else {
       val earthRadius = 6357 // km
 
@@ -36,14 +35,13 @@ object Visualization {
         if (a == location) 0
         else if ((a.lon + location.lon).abs < 1 / kmPerDegree && (a.lat + location.lat).abs < 1 / kmPerDegree) math.Pi
         else {
-          val absDiffLon = (math.toRadians(a.lon) - math.toRadians(location.lon)).abs
+          val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
 
-          // TODO: optimize! Check apache fast math
-          math.acos(math.sin(math.toRadians(a.lat)) * math.sin(math.toRadians(location.lat))
-            + math.cos(math.toRadians(a.lat)) * math.cos(math.toRadians(location.lat)) * math.cos(absDiffLon))
+          FastMath.acos(FastMath.sin(FastMath.toRadians(a.lat)) * FastMath.sin(FastMath.toRadians(location.lat))
+            + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
         }
 
-      def distance(a: Location, p: Double = 1.5) = math.pow(earthRadius * greatCircle(a), -p)
+      def distance(a: Location, p: Double = 1.5) = FastMath.pow(earthRadius * greatCircle(a), -p)
 
       val weights = temperatures.par.map{case (l, t) => distance(l) -> t}
 
@@ -119,11 +117,7 @@ object Visualization {
     } else if (value <= scale.keys.min) {
       scale(scale.keys.min)
     } else {
-      val closest = Seq(scale.to(value).lastOption, scale.from(value).headOption)
-        .flatten
-        .distinct
-
-      interpolator(closest.head, closest.tail.head, value)
+      interpolator(scale.to(value).lastOption.head, scale.from(value).headOption.head, value)
     }
   }
 
@@ -134,9 +128,18 @@ object Visualization {
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
 
-    // BASE START:                          Total time: 6089.689545249999 ms
-    // Taking out calculating the scale:    Total time: 5097.940386700001 ms
+    // BASE START:                            Total time: 6089.689545249999 ms
+    // Taking out calculating the scale:      Total time: 5097.940386700001 ms
+    // Taking out the square root:            Total time: 4967.327434350001 ms
+    // Switching to greatCircle to FastMath:  Total time: 3724.4725129499993 ms
+    // Refactor all math to FastMath:         Total time: 3534.2878032 ms
+    // Removing unnecessary seq:              Total time: 3338.6400333000006 ms
 
+    val totalLatitude = 180
+    val totalLongitude = 360
+
+    val height = 180
+    val width = 360
 
     // TODO: since we know the level of granularity that an image can have we can reduce the complexity of the problem
     // by rounding the location to the smallest level of granularity supported by the current image.
@@ -145,29 +148,12 @@ object Visualization {
     val tempScale = calculateScale(colors)
 
     def worldCoordinates(i: Int): (Int, Int) = {
-      val floored = math.floor(i / 360f).toInt
+      val floored = FastMath.floor(i / 360f).toInt
       val lon = i - 360 * floored - 180
       val lat = 90 - floored
       (lat, lon)}
 
-    val width = 360
-    val height = 180
-
     val worldCoords = 0 until (width * height)
-//
-//    val worldTemperatures = worldCoords.par.map{ i => {
-//      val (lat, lon) = worldCoordinates(i)
-//      val loc = Location(lat, lon)
-//      val temp = predictTemperature(temperatures, loc)
-//      loc -> temp
-//    }}.toMap
-//
-//    val worldColors = worldCoords.par.map{i => {
-//      val (lat, lon) = worldCoordinates(i)
-//      val loc = Location(lat, lon)
-//      val col = interpolateColor(colors, worldTemperatures(loc))
-//      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
-//    }}
 
     val worldColors = worldCoords.par.map{i => {
       val (lat, lon) = worldCoordinates(i)
