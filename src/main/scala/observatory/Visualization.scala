@@ -1,16 +1,15 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
-//import com.typesafe.scalalogging.LazyLogging
-//import org.apache.commons.math3.util.Math
+import com.typesafe.scalalogging.LazyLogging
+import org.apache.commons.math3.util.FastMath
 
 import scala.collection.immutable.TreeMap
 
 /**
   * 2nd milestone: basic visualization
   */
-//object Visualization extends LazyLogging {
-object Visualization {
+object Visualization extends LazyLogging {
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
     * @param location Location where to predict the temperature
@@ -40,16 +39,16 @@ object Visualization {
         else if ((a.lon + location.lon).abs < oneOverKmPerDegree
           && (a.lat + location.lat).abs < oneOverKmPerDegree) math.Pi
         else {
-          val absDiffLon = (Math.toRadians(a.lon) - Math.toRadians(location.lon)).abs
+          val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
 
-          Math.acos(Math.sin(Math.toRadians(a.lat)) * Math.sin(Math.toRadians(location.lat))
-            + Math.cos(Math.toRadians(a.lat)) * Math.cos(Math.toRadians(location.lat)) * Math.cos(absDiffLon))
+          FastMath.acos(FastMath.sin(FastMath.toRadians(a.lat)) * FastMath.sin(FastMath.toRadians(location.lat))
+            + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
         }
 
       def distance(a: Location) = {
         val dist = greatCircle(a)
         val corDist = if (dist.isNaN) 1 else dist
-        Math.pow(earthRadius * corDist, -p)
+        FastMath.pow(earthRadius * corDist, -p)
       }
 
       val weightsCalc = temperatures.foldLeft((0d, 0d))((acc, key) => {
@@ -75,7 +74,7 @@ object Visualization {
         val x1 = color2._1
 
         val scale = ((toInterpolate - x0) / (x1 - x0).toFloat).toFloat
-        Math.round(y0 * (1f - scale) + y1 * scale)
+        FastMath.round(y0 * (1f - scale) + y1 * scale)
       }
 
       val redComp = linearInterpolation(color1._2.red, color2._2.red)
@@ -143,8 +142,8 @@ object Visualization {
     // BASE START:                            Total time: 6089.689545249999 ms
     // Taking out calculating the scale:      Total time: 5097.940386700001 ms
     // Taking out the square root:            Total time: 4967.327434350001 ms
-    // Switching to greatCircle to Math:  Total time: 3724.4725129499993 ms
-    // Refactor all math to Math:         Total time: 3534.2878032 ms
+    // Switching to greatCircle to FastMath:  Total time: 3724.4725129499993 ms
+    // Refactor all math to FastMath:         Total time: 3534.2878032 ms
     // Removing unnecessary seq:              Total time: 3338.6400333000006 ms
     // Removing double foldLeft:              Total time: 2950.2546134500003 ms
     // Similar results after removing all pars and removing branching from foldLeft in predictTemperature
@@ -164,7 +163,7 @@ object Visualization {
     val width = 360
 
     def roundToNearest(d: Double, n: Double): Double =
-      Math.round(d * n)
+      FastMath.round(d * n)
 
     def reducePrecision(imgHeight: Double, imgWidth: Double,
                         toReduce: Iterable[(Location, Temperature)]): Iterable[(Location, Temperature)] = {
@@ -182,15 +181,15 @@ object Visualization {
       }.seq
     }
 
-//    logger.debug(s"Before reduction we have ${temperatures.toSeq.length}")
+    logger.debug(s"Before reduction we have ${temperatures.toSeq.length}")
     val reducedTemps = reducePrecision(height, width, temperatures)
 
-//    logger.debug(s"Before reduction we have ${reducedTemps.toSeq.length}")
+    logger.debug(s"Before reduction we have ${reducedTemps.toSeq.length}")
 
     val tempScale = calculateScale(colors)
 
     def worldCoordinates(i: Int): (Int, Int) = {
-      val floored = Math.floor(i / 360f).toInt
+      val floored = FastMath.floor(i / 360f).toInt
       val lon = i - 360 * floored - 180
       val lat = 90 - floored
       (lat, lon)}
@@ -205,7 +204,7 @@ object Visualization {
     val imgArray = worldColors.toArray
 
     val img = Image(width, height, imgArray)
-    img.output(new java.io.File("target/some-image.png"))
+    //img.output(new java.io.File("target/some-image.png"))
     img
   }
 }
