@@ -18,6 +18,9 @@ object Visualization extends LazyLogging {
   def predictTemperature(temperatures: Iterable[(Location, Temperature)], location: Location): Temperature = {
     // Based on https://gis.stackexchange.com/questions/142326/calculating-longitude-length-in-miles
     val kmPerDegree = 111d
+    val oneOverKmPerDegree = 1 / kmPerDegree
+    val oneOverKmPerDegreeSq = 1 / (kmPerDegree * kmPerDegree)
+    val p = 6d
 
     def squaredEuclideanDistance(a: Location): Double = {
       (a.lon - location.lon) * (a.lon - location.lon) + (a.lat - location.lat) * (a.lat - location.lat)
