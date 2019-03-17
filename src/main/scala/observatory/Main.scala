@@ -7,7 +7,6 @@ import org.apache.log4j.{Level, Logger}
 object Main extends App with LazyLogging {
 
   Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
-  Logger.getLogger("observatory").setLevel(Level.DEBUG)
   val forkJoinPool = new java.util.concurrent.ForkJoinPool(3)
 
   logger.info("Loading data")
@@ -46,7 +45,7 @@ object Main extends App with LazyLogging {
 
   import Visualization._
 
-  println(s"Visualization using ${temps.toSeq.length}")
+  logger.info(s"Visualization using ${temps.toSeq.length}")
 //  val time = config(
 //    Key.exec.benchRuns -> 20,
 //    Key.verbose -> false
