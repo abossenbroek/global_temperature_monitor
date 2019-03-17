@@ -23,17 +23,17 @@ object Visualization {
     }
 
     val squaredEuclidianDistances = temperatures
-      .par
       .map{case (l, t) => squaredEuclideanDistance(l) -> t}.toMap
 
-    if (squaredEuclidianDistances.keys.min < (1.0 / (kmPerDegree * kmPerDegree))) {
+    if (squaredEuclidianDistances.keys.min < oneOverKmPerDegreeSq) {
       squaredEuclidianDistances(squaredEuclidianDistances.keys.min)
     } else {
       val earthRadius = 6357 // km
 
       def greatCircle(a: Location): Double =
         if (a == location) 0
-        else if ((a.lon + location.lon).abs < 1 / kmPerDegree && (a.lat + location.lat).abs < 1 / kmPerDegree) math.Pi
+        else if ((a.lon + location.lon).abs < oneOverKmPerDegree
+          && (a.lat + location.lat).abs < oneOverKmPerDegree) math.Pi
         else {
           val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
 
@@ -43,7 +43,7 @@ object Visualization {
 
       def distance(a: Location, p: Double = 2) = FastMath.pow(earthRadius * greatCircle(a), -p)
 
-      val weightsCalc = temperatures.par.foldLeft((0d, 0d))((acc, key) => {
+      val weightsCalc = temperatures.foldLeft((0d, 0d))((acc, key) => {
         val dist = distance(key._1)
         val acc1 = acc._1 + dist * key._2
         val acc2 = acc._2 + dist
@@ -51,6 +51,7 @@ object Visualization {
       })
 
       weightsCalc._1 / weightsCalc._2
+
     }
   }
 
@@ -65,8 +66,8 @@ object Visualization {
         val x0 = color1._1
         val x1 = color2._1
 
-        val scale = (toInterpolate - x0) / (x1 - x0).toFloat
-        (y0 * (1f - scale) + y1 * scale).round.toInt
+        val scale = ((toInterpolate - x0) / (x1 - x0).toFloat).toFloat
+        FastMath.round(y0 * (1f - scale) + y1 * scale)
       }
 
       val redComp = linearInterpolation(color1._2.red, color2._2.red)
@@ -92,7 +93,7 @@ object Visualization {
   }
 
   def calculateScale(points: Iterable[(Temperature, Color)]): TreeMap[Temperature, Color] = {
-    points.toSeq.par
+    points.toSeq
         .foldLeft(TreeMap[Temperature, Color]())((map, key) =>
           map + (key._1 -> key._2))
   }
@@ -130,6 +131,7 @@ object Visualization {
     */
   def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
 
+    // All performance checks on 500 locations:
     // BASE START:                            Total time: 6089.689545249999 ms
     // Taking out calculating the scale:      Total time: 5097.940386700001 ms
     // Taking out the square root:            Total time: 4967.327434350001 ms
@@ -137,6 +139,16 @@ object Visualization {
     // Refactor all math to FastMath:         Total time: 3534.2878032 ms
     // Removing unnecessary seq:              Total time: 3338.6400333000006 ms
     // Removing double foldLeft:              Total time: 2950.2546134500003 ms
+    // Similar results after removing all pars and removing branching from foldLeft in predictTemperature
+
+    // Bigger benchmark:
+    //    Visualization using 2000
+    //    Total time: 14690.48794335 ms
+    //
+    // After reducing the level of detail in the lat/lon we find:
+    //    Visualization using 2000
+    //    Total time: 13152.365002850003 ms
+    // But with some black dots
 
     val totalLatitude = 180
     val totalLongitude = 360
@@ -144,9 +156,29 @@ object Visualization {
     val height = 180
     val width = 360
 
-    // TODO: since we know the level of granularity that an image can have we can reduce the complexity of the problem
-    // by rounding the location to the smallest level of granularity supported by the current image.
-    // Once the rounding is performed we can do calculate the average temperature before continuing.
+    def roundToNearest(d: Double, n: Double): Double =
+      FastMath.round(d * n)
+
+    def reducePrecision(imgHeight: Double, imgWidth: Double,
+                        toReduce: Iterable[(Location, Temperature)]): Iterable[(Location, Temperature)] = {
+      val heightNearest = imgHeight / totalLatitude
+      val widthNearest = imgWidth / totalLongitude
+
+      val reduced = toReduce.par.map{case (l, t) =>
+        val newLat = roundToNearest(l.lat, heightNearest)
+        val newLon = roundToNearest(l.lon, widthNearest)
+        ((newLat, newLon), t)
+      }.toMap
+
+      reduced.groupBy(_._1).par.map{ case (k, l) =>
+        (Location(k._1 / heightNearest, k._2 / widthNearest), l.map{case (_, t) => t}.sum / l.toSeq.length)
+      }.seq
+    }
+
+    println(s"Before reduction we have ${temperatures.toSeq.length}")
+    val reducedTemps = reducePrecision(height, width, temperatures)
+
+    println(s"Before reduction we have ${reducedTemps.toSeq.length}")
 
     val tempScale = calculateScale(colors)
 
@@ -160,13 +192,20 @@ object Visualization {
 
     val worldColors = worldCoords.par.map{i => {
       val (lat, lon) = worldCoordinates(i)
-      val col = interpolateColorWithScale(tempScale, predictTemperature(temperatures, Location(lat, lon)))
+      val col = interpolateColorWithScale(tempScale, predictTemperature(reducedTemps, Location(lat, lon)))
+      if ((lon > 92 && lon < 97) && (lat > -15 && lat < -10)) {
+        println("********************************************************************************")
+        println(s"for (lat, lon): ($lat, $lon), pixval (${lon + 180}, ${-(-lat - 90)})")
+        println(s"Predicted temp: ${predictTemperature(reducedTemps, Location(lat, lon))}")
+        println(s"Col rgb:        ${col.red}, ${col.green}, ${col.blue}")
+        println(s"Pixel:          ${Pixel(PixelTools.rgb(col.red, col.green, col.blue))}")
+      }
       Pixel(PixelTools.rgb(col.red, col.green, col.blue))
     }}
     val imgArray = worldColors.toArray
 
     val img = Image(width, height, imgArray)
-//    img.output(new java.io.File("target/some-image.png"))
+    img.output(new java.io.File("target/some-image-2000.png"))
     img
   }
 
