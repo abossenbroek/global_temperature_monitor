@@ -1,11 +1,16 @@
 package observatory
 
-object Main extends App {
-  import org.apache.log4j.{Level, Logger}
+import com.typesafe.scalalogging.LazyLogging
+import org.apache.log4j.{Level, Logger}
+//import org.scalameter._
+
+object Main extends App with LazyLogging {
+
   Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
-  val forkJoinPool = new java.util.concurrent.ForkJoinPool(6)
-//
-  println("Loading data")
+  Logger.getLogger("observatory").setLevel(Level.DEBUG)
+  val forkJoinPool = new java.util.concurrent.ForkJoinPool(3)
+
+  logger.info("Loading data")
  val temp1989 = Extraction.locateTemperatures(1989,
    "/stations.csv",
 ////   "/temperature_test.csv")
@@ -13,11 +18,19 @@ object Main extends App {
 //  // "src/main/resources/[12]*.csv")
   "/1989.csv")
 //
-  println("Extracting temperatures")
+  logger.info("Extracting temperatures")
   val temps = Extraction.locationYearlyAverageRecords(temp1989)
+//
+//  val fos = new FileOutputStream("temp.tmp")
+//  val oos = new ObjectOutputStream(fos)
+//  oos.writeObject(temps.take(2000))
+//  oos.close()
 
-  import Visualization._
-//  val glacierLoc = Location(48.6598091, -114.1260281)
+//  val fis = new FileInputStream("temp.tmp")
+//  val ois = new ObjectInputStream(fis)
+//  val temps = ois.readObject().asInstanceOf[Iterable[(Location, Temperature)]]
+
+  //  val glacierLoc = Location(48.6598091, -114.1260281)
 //  val amsterdamLoc = Location(52.3546274, 4.8285839)
 //  val londonLoc = Location(51.5285582, -0.2416796)
 //  val temps = List((glacierLoc, -10d), (amsterdamLoc, 5d), (londonLoc, 10d))
@@ -31,8 +44,21 @@ object Main extends App {
     (32d, Color(255, 0, 0)),
     (60d, Color(255, 255, 255)))
 
-  println("Visualization")
-  visualize(temps, colorScale)
+  import Visualization._
 
-  forkJoinPool.shutdown()
+  println(s"Visualization using ${temps.toSeq.length}")
+//  val time = config(
+//    Key.exec.benchRuns -> 20,
+//    Key.verbose -> false
+//  ) withWarmer {
+//    new Warmer.Default
+//  } withMeasurer {
+//    new Measurer.IgnoringGC
+//  } measure {
+    visualize(temps, colorScale)
+//  }
+//
+//  println(s"Total time: $time")
+
+    forkJoinPool.shutdown()
 }
