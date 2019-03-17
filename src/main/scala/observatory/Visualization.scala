@@ -31,25 +31,17 @@ object Visualization {
     } else {
       val earthRadius = 6357 // km
 
-      def isSameLocation(l: Location): Boolean = l == location
-
-      def isAntipodal(l: Location): Boolean =
-        (l.lon + location.lon).abs < 1 / kmPerDegree && (l.lat + location.lat).abs < 1 / kmPerDegree
-
-
       def greatCircle(a: Location): Double =
-        if (isSameLocation(a)) 0
-        else if (isAntipodal(a)) math.Pi
+        if (a == location) 0
+        else if ((a.lon + location.lon).abs < 1 / kmPerDegree && (a.lat + location.lat).abs < 1 / kmPerDegree) math.Pi
         else {
           val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
-          val aLatRad = FastMath.toRadians(a.lat)
-          val locLatRad = FastMath.toRadians(location.lat)
 
-          FastMath.acos(FastMath.sin(aLatRad) * FastMath.sin(locLatRad)
-            + FastMath.cos(aLatRad) * FastMath.cos(locLatRad) * FastMath.cos(absDiffLon))
+          FastMath.acos(FastMath.sin(FastMath.toRadians(a.lat)) * FastMath.sin(FastMath.toRadians(location.lat))
+            + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
         }
 
-      def distance(a: Location, p: Double = 1.5) = FastMath.pow(earthRadius * greatCircle(a), -p)
+      def distance(a: Location, p: Double = 2) = FastMath.pow(earthRadius * greatCircle(a), -p)
 
       val weightsCalc = temperatures.par.foldLeft((0d, 0d))((acc, key) => {
         val dist = distance(key._1)
