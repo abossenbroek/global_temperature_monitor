@@ -1,6 +1,7 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
+import com.typesafe.scalalogging.LazyLogging
 import org.apache.commons.math3.util.FastMath
 
 import scala.collection.immutable.TreeMap
@@ -8,7 +9,7 @@ import scala.collection.immutable.TreeMap
 /**
   * 2nd milestone: basic visualization
   */
-object Visualization {
+object Visualization extends LazyLogging {
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
     * @param location Location where to predict the temperature
@@ -175,10 +176,10 @@ object Visualization {
       }.seq
     }
 
-    println(s"Before reduction we have ${temperatures.toSeq.length}")
+    logger.debug(s"Before reduction we have ${temperatures.toSeq.length}")
     val reducedTemps = reducePrecision(height, width, temperatures)
 
-    println(s"Before reduction we have ${reducedTemps.toSeq.length}")
+    logger.debug(s"Before reduction we have ${reducedTemps.toSeq.length}")
 
     val tempScale = calculateScale(colors)
 
