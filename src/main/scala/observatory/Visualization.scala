@@ -51,12 +51,14 @@ object Visualization {
 
       def distance(a: Location, p: Double = 1.5) = FastMath.pow(earthRadius * greatCircle(a), -p)
 
-      val weights = temperatures.par.map{case (l, t) => distance(l) -> t}
+      val weightsCalc = temperatures.par.foldLeft((0d, 0d))((acc, key) => {
+        val dist = distance(key._1)
+        val acc1 = acc._1 + dist * key._2
+        val acc2 = acc._2 + dist
+        (acc1, acc2)
+      })
 
-      val weigthNumerator = weights.foldLeft(0d)((acc, key) => acc + key._1 * key._2)
-      val weigthDenum = weights.foldLeft(0d)((acc, key) => acc + key._1)
-
-      weigthNumerator / weigthDenum
+      weightsCalc._1 / weightsCalc._2
     }
   }
 
@@ -142,6 +144,7 @@ object Visualization {
     // Switching to greatCircle to FastMath:  Total time: 3724.4725129499993 ms
     // Refactor all math to FastMath:         Total time: 3534.2878032 ms
     // Removing unnecessary seq:              Total time: 3338.6400333000006 ms
+    // Removing double foldLeft:              Total time: 2950.2546134500003 ms
 
     val totalLatitude = 180
     val totalLongitude = 360
