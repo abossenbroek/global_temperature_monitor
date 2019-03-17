@@ -31,22 +31,30 @@ object Visualization {
     } else {
       val earthRadius = 6357 // km
 
+      def isSameLocation(l: Location): Boolean = l == location
+
+      def isAntipodal(l: Location): Boolean =
+        (l.lon + location.lon).abs < 1 / kmPerDegree && (l.lat + location.lat).abs < 1 / kmPerDegree
+
+
       def greatCircle(a: Location): Double =
-        if (a == location) 0
-        else if ((a.lon + location.lon).abs < 1 / kmPerDegree && (a.lat + location.lat).abs < 1 / kmPerDegree) math.Pi
+        if (isSameLocation(a)) 0
+        else if (isAntipodal(a)) math.Pi
         else {
           val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
+          val aLatRad = FastMath.toRadians(a.lat)
+          val locLatRad = FastMath.toRadians(location.lat)
 
-          FastMath.acos(FastMath.sin(FastMath.toRadians(a.lat)) * FastMath.sin(FastMath.toRadians(location.lat))
-            + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
+          FastMath.acos(FastMath.sin(aLatRad) * FastMath.sin(locLatRad)
+            + FastMath.cos(aLatRad) * FastMath.cos(locLatRad) * FastMath.cos(absDiffLon))
         }
 
       def distance(a: Location, p: Double = 1.5) = FastMath.pow(earthRadius * greatCircle(a), -p)
 
       val weights = temperatures.par.map{case (l, t) => distance(l) -> t}
 
-      val weigthNumerator = weights.par.foldLeft(0d)((acc, key) => acc + key._1 * key._2)
-      val weigthDenum = weights.par.foldLeft(0d)((acc, key) => acc + key._1)
+      val weigthNumerator = weights.foldLeft(0d)((acc, key) => acc + key._1 * key._2)
+      val weigthDenum = weights.foldLeft(0d)((acc, key) => acc + key._1)
 
       weigthNumerator / weigthDenum
     }
