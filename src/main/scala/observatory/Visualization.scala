@@ -59,7 +59,6 @@ object Visualization extends LazyLogging {
       })
 
       weightsCalc._1 / weightsCalc._2
-
     }
   }
 
@@ -156,7 +155,6 @@ object Visualization extends LazyLogging {
     // After reducing the level of detail in the lat/lon we find:
     //    Visualization using 2000
     //    Total time: 13152.365002850003 ms
-    // But with some black dots
 
     val totalLatitude = 180
     val totalLongitude = 360
@@ -201,21 +199,13 @@ object Visualization extends LazyLogging {
     val worldColors = worldCoords.par.map{i => {
       val (lat, lon) = worldCoordinates(i)
       val col = interpolateColorWithScale(tempScale, predictTemperature(reducedTemps, Location(lat, lon)))
-      if ((lon > 92 && lon < 97) && (lat > -15 && lat < -10)) {
-        println("********************************************************************************")
-        println(s"for (lat, lon): ($lat, $lon), pixval (${lon + 180}, ${-(-lat - 90)})")
-        println(s"Predicted temp: ${predictTemperature(reducedTemps, Location(lat, lon))}")
-        println(s"Col rgb:        ${col.red}, ${col.green}, ${col.blue}")
-        println(s"Pixel:          ${Pixel(PixelTools.rgb(col.red, col.green, col.blue))}")
-      }
       Pixel(PixelTools.rgb(col.red, col.green, col.blue))
     }}
     val imgArray = worldColors.toArray
 
     val img = Image(width, height, imgArray)
-    img.output(new java.io.File("target/some-image-2000.png"))
+    //img.output(new java.io.File("target/some-image.png"))
     img
   }
-
 }
 
