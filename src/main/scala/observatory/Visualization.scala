@@ -45,7 +45,11 @@ object Visualization extends LazyLogging {
             + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
         }
 
-      def distance(a: Location, p: Double = 2) = FastMath.pow(earthRadius * greatCircle(a), -p)
+      def distance(a: Location) = {
+        val dist = greatCircle(a)
+        val corDist = if (dist.isNaN) 1 else dist
+        FastMath.pow(earthRadius * corDist, -p)
+      }
 
       val weightsCalc = temperatures.foldLeft((0d, 0d))((acc, key) => {
         val dist = distance(key._1)
