@@ -1,15 +1,16 @@
 package observatory
 
-import com.typesafe.scalalogging.LazyLogging
+//import com.typesafe.scalalogging.LazyLogging
 import org.apache.log4j.{Level, Logger}
 //import org.scalameter._
 
-object Main extends App with LazyLogging {
+//object Main extends App with LazyLogging {
+object Main extends App {
 
   Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
   val forkJoinPool = new java.util.concurrent.ForkJoinPool(3)
 
-  logger.info("Loading data")
+//  logger.info("Loading data")
  val temp1989 = Extraction.locateTemperatures(1989,
    "/stations.csv",
 ////   "/temperature_test.csv")
@@ -17,7 +18,7 @@ object Main extends App with LazyLogging {
 //  // "src/main/resources/[12]*.csv")
   "/1989.csv")
 //
-  logger.info("Extracting temperatures")
+//  logger.info("Extracting temperatures")
   val temps = Extraction.locationYearlyAverageRecords(temp1989)
 //
 //  val fos = new FileOutputStream("temp.tmp")
@@ -45,7 +46,7 @@ object Main extends App with LazyLogging {
 
   import Visualization._
 
-  logger.info(s"Visualization using ${temps.toSeq.length}")
+//  logger.info(s"Visualization using ${temps.toSeq.length}")
 //  val time = config(
 //    Key.exec.benchRuns -> 20,
 //    Key.verbose -> false

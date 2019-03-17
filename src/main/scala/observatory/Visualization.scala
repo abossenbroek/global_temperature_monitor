@@ -1,15 +1,16 @@
 package observatory
 
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
-import com.typesafe.scalalogging.LazyLogging
-import org.apache.commons.math3.util.FastMath
+//import com.typesafe.scalalogging.LazyLogging
+//import org.apache.commons.math3.util.Math
 
 import scala.collection.immutable.TreeMap
 
 /**
   * 2nd milestone: basic visualization
   */
-object Visualization extends LazyLogging {
+//object Visualization extends LazyLogging {
+object Visualization {
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
     * @param location Location where to predict the temperature
@@ -39,16 +40,16 @@ object Visualization extends LazyLogging {
         else if ((a.lon + location.lon).abs < oneOverKmPerDegree
           && (a.lat + location.lat).abs < oneOverKmPerDegree) math.Pi
         else {
-          val absDiffLon = (FastMath.toRadians(a.lon) - FastMath.toRadians(location.lon)).abs
+          val absDiffLon = (Math.toRadians(a.lon) - Math.toRadians(location.lon)).abs
 
-          FastMath.acos(FastMath.sin(FastMath.toRadians(a.lat)) * FastMath.sin(FastMath.toRadians(location.lat))
-            + FastMath.cos(FastMath.toRadians(a.lat)) * FastMath.cos(FastMath.toRadians(location.lat)) * FastMath.cos(absDiffLon))
+          Math.acos(Math.sin(Math.toRadians(a.lat)) * Math.sin(Math.toRadians(location.lat))
+            + Math.cos(Math.toRadians(a.lat)) * Math.cos(Math.toRadians(location.lat)) * Math.cos(absDiffLon))
         }
 
       def distance(a: Location) = {
         val dist = greatCircle(a)
         val corDist = if (dist.isNaN) 1 else dist
-        FastMath.pow(earthRadius * corDist, -p)
+        Math.pow(earthRadius * corDist, -p)
       }
 
       val weightsCalc = temperatures.foldLeft((0d, 0d))((acc, key) => {
@@ -74,7 +75,7 @@ object Visualization extends LazyLogging {
         val x1 = color2._1
 
         val scale = ((toInterpolate - x0) / (x1 - x0).toFloat).toFloat
-        FastMath.round(y0 * (1f - scale) + y1 * scale)
+        Math.round(y0 * (1f - scale) + y1 * scale)
       }
 
       val redComp = linearInterpolation(color1._2.red, color2._2.red)
@@ -163,7 +164,7 @@ object Visualization extends LazyLogging {
     val width = 360
 
     def roundToNearest(d: Double, n: Double): Double =
-      FastMath.round(d * n)
+      Math.round(d * n)
 
     def reducePrecision(imgHeight: Double, imgWidth: Double,
                         toReduce: Iterable[(Location, Temperature)]): Iterable[(Location, Temperature)] = {
@@ -181,15 +182,15 @@ object Visualization extends LazyLogging {
       }.seq
     }
 
-    logger.debug(s"Before reduction we have ${temperatures.toSeq.length}")
+//    logger.debug(s"Before reduction we have ${temperatures.toSeq.length}")
     val reducedTemps = reducePrecision(height, width, temperatures)
 
-    logger.debug(s"Before reduction we have ${reducedTemps.toSeq.length}")
+//    logger.debug(s"Before reduction we have ${reducedTemps.toSeq.length}")
 
     val tempScale = calculateScale(colors)
 
     def worldCoordinates(i: Int): (Int, Int) = {
-      val floored = FastMath.floor(i / 360f).toInt
+      val floored = Math.floor(i / 360f).toInt
       val lon = i - 360 * floored - 180
       val lat = 90 - floored
       (lat, lon)}
