@@ -5,7 +5,16 @@ package observatory
   * @param lat Degrees of latitude, -90 ≤ lat ≤ 90
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
-case class Location(lat: Double, lon: Double)
+case class Location(lat: Double, lon: Double) {
+  def myTile(zoom: Int): Tile = {
+    val n: Double = 1 << zoom
+    val xTile = (lon + 180d) / 360d * n
+    val latRad = math.toRadians(lat)
+    val yTile = (1d - math.log(math.tan(latRad) + (1 / math.cos(latRad))) / math.Pi) / 2.0 * n
+
+    Tile(xTile.toInt, yTile.toInt, zoom)
+  }
+}
 
 /**
   * Introduced in Week 3. Represents a tiled web map tile.
@@ -15,7 +24,11 @@ case class Location(lat: Double, lon: Double)
   * @param y Y coordinate of the tile
   * @param zoom Zoom level, 0 ≤ zoom ≤ 19
   */
-case class Tile(x: Int, y: Int, zoom: Int)
+case class Tile(x: Int, y: Int, zoom: Int) {
+  lazy val n: Double = 1 << zoom
+  lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / n)))),
+    x.toDouble / n * 360d - 180d)
+}
 
 /**
   * Introduced in Week 4. Represents a point on a grid composed of

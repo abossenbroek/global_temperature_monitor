@@ -19,21 +19,13 @@ object Interaction {
     * @return The latitude and longitude of the top-left corner of the tile, as per http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     */
   def tileLocation(tile: Tile): Location = {
-    val n = math.pow(2.0, tile.zoom)
-
-    def lat: Double =
-      math.toDegrees(math.atan(math.sinh(math.Pi * (1 - 2 * tile.y / n))))
-
-    def lon: Double =
-      tile.x / n * 360d - 180d
-
-    Location(lat, lon)
+    tile.location
   }
 
   /**
     * @param temperatures Known temperatures
-    * @param colors Color scale
-    * @param tile Tile coordinates
+    * @param colors       Color scale
+    * @param tile         Tile coordinates
     * @return A 256×256 image showing the contents of the given tile
     */
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
@@ -51,25 +43,26 @@ object Interaction {
       (rowNum, colNum)
     }
 
-    val latMap = (0 until width).map{i =>
+    val latMap = (0 until width).map { i =>
       tileLoc.lat + latSpan * i
     }
 
-    val lonMap = (0 until width).map{i =>
+    val lonMap = (0 until width).map { i =>
       lonSpan * i + tileLoc.lon
     }
 
     val tempScale = Visualization.calculateScale(colors)
 
     val worldCoords = 0 until (width * width)
-    val worldColors = worldCoords.par.map{i => {
+    val worldColors = worldCoords.par.map { i => {
       val (rowIndex, colIndex) = indices(i)
       val lat = latMap(rowIndex)
       val lon = lonMap(colIndex)
       val col = Visualization.interpolateColorWithScale(tempScale,
         Visualization.predictTemperature(temperatures, Location(lat, lon)))
       Pixel(PixelTools.argb(alpha, col.red, col.green, col.blue))
-    }}
+    }
+    }
     val imgArray = worldColors.toArray
 
     val img = Image(width, width, imgArray)
@@ -78,17 +71,18 @@ object Interaction {
 
   /**
     * Generates all the tiles for zoom levels 0 to 3 (included), for all the given years.
-    * @param yearlyData Sequence of (year, data), where `data` is some data associated with
-    *                   `year`. The type of `data` can be anything.
+    *
+    * @param yearlyData    Sequence of (year, data), where `data` is some data associated with
+    *                      `year`. The type of `data` can be anything.
     * @param generateImage Function that generates an image given a year, a zoom level, the x and
     *                      y coordinates of the tile and the data to build the image from
     */
   def generateTiles[Data](
-    yearlyData: Iterable[(Year, Data)],
-    generateImage: (Year, Tile, Data) => Unit
-  ): Unit = {
+                           yearlyData: Iterable[(Year, Data)],
+                           generateImage: (Year, Tile, Data) => Unit
+                         ): Unit = {
 
-    def genMap(zoom: Int, year: Year, data: Data) : Unit =  {
+    def genMap(zoom: Int, year: Year, data: Data): Unit = {
       val xTiles = math.pow(2, zoom).toInt
       val totalTiles = xTiles * xTiles
 
@@ -98,25 +92,27 @@ object Interaction {
         (rowNum, colNum)
       }
 
-      (0 until totalTiles).foreach{i =>
+      (0 until totalTiles).foreach { i =>
         val (rowIdx, colIdx) = indices(i)
         generateImage(year, Tile(colIdx, rowIdx, zoom), data)
       }
     }
 
-    val maps = yearlyData.flatMap{i =>
-      (0 to 3).map{z =>
-        Future{genMap(z, i._1, i._2)}
+    val maps = yearlyData.flatMap { i =>
+      (0 to 3).map { z =>
+        Future {
+          genMap(z, i._1, i._2)
+        }
       }
     }
 
     maps.foreach(f => Await.result(f, 5000 second))
 
-//    for {
-//      (y, d) <- yearlyData
-//      z <- 1 to 3
-//      //f <- Future(genMap(z, y, d))
-//    }(genMap(z, y, d))
+    //    for {
+    //      (y, d) <- yearlyData
+    //      z <- 1 to 3
+    //      //f <- Future(genMap(z, y, d))
+    //    }(genMap(z, y, d))
 
   }
 
