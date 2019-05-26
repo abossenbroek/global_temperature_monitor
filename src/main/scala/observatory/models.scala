@@ -28,6 +28,13 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   lazy val n: Double = 1 << zoom
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / n)))),
     x.toDouble / n * 360d - 180d)
+
+  lazy val nextTile: Tile = Tile(x + 1, y+ 1, zoom)
+
+  lazy val latSpan: Double = math.abs(nextTile.location.lat - location.lat)
+  lazy val lonSpan: Double = math.abs(nextTile.location.lon - location.lon)
+
+  // TODO: consider refactoring image conversion to here
 }
 
 /**
