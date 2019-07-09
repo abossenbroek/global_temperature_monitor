@@ -31,36 +31,43 @@ object Interaction {
     val width = 256f
 //    val width = 128f
     val alpha = 70
-    val latIdx = tile.latSpan / width
-    val lonIdx = tile.lonSpan / width.toFloat
+//    val latIdx = tile.latSpan / width
+//    val lonIdx = tile.lonSpan / width
+
+    // TODO:
+    // 1. Determine left and right most x
+    // 2. Determine top and bottom most y
+
 
     // TODO: add check to map indices back to proper lat lon with slippy map tilenames
     // Check possible use of https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Subtiles
-    def indices(i: Int): (Int, Int) = {
-      val rowNum = math.floor(i / width)
-      val colNum = i - width * rowNum
-      (rowNum.toInt, colNum.toInt)
-    }
-
-    val latMap = (0 until width.toInt).map { i =>
-      tile.location.lat + latIdx * i
-    }
-
-    val lonMap = (0 until width.toInt).map { i =>
-      tile.location.lon + lonIdx * i
-    }
-
-    val tempScale = Visualization.calculateScale(colors)
+//    def indices(i: Int): (Int, Int) = {
+//      val rowNum = math.floor(i / width)
+//      val colNum = i - width * rowNum
+//      (rowNum.toInt, colNum.toInt)
+//    }
+//
+//    // TODO: these are pure x, y pixels values and not mercator mapping
+//    val latMap = (0 until width.toInt).map { i =>
+//      tile.location.lat + latIdx * i
+//    }
+//
+//    val lonMap = (0 until width.toInt).map { i =>
+//      tile.location.lon + lonIdx * i
+//    }
+//
+//    val tempScale = Visualization.calculateScale(colors)
 
     val worldCoords = 0 until (width.toInt * width.toInt)
     val worldColors = worldCoords.par.map { i => {
-//    val worldColors = worldCoords.map { i => {
-      val (rowIndex, colIndex) = indices(i)
-      val lat = latMap(rowIndex)
-      val lon = lonMap(colIndex)
-      val col = Visualization.interpolateColorWithScale(tempScale,
-        Visualization.predictTemperature(temperatures, Location(lat, lon)))
-      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+      //    val worldColors = worldCoords.map { i => {
+//      val (rowIndex, colIndex) = indices(i)
+//      val lat = latMap(rowIndex)
+//      val lon = lonMap(colIndex)
+//      val col = Visualization.interpolateColorWithScale(tempScale,
+//        Visualization.predictTemperature(temperatures, Location(lat, lon)))
+//      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+      Pixel(PixelTools.rgb(0, 0, 0))
     }
     }
     val imgArray = worldColors.toArray

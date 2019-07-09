@@ -2,6 +2,7 @@ package observatory
 
 /**
   * Introduced in Week 1. Represents a location on the globe.
+  *
   * @param lat Degrees of latitude, -90 ≤ lat ≤ 90
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
@@ -25,14 +26,15 @@ case class Location(lat: Double, lon: Double) {
   * @param zoom Zoom level, 0 ≤ zoom ≤ 19
   */
 case class Tile(x: Int, y: Int, zoom: Int) {
-  lazy val n: Double = 1 << zoom
-  lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / n)))),
-    x.toDouble / n * 360d - 180d)
+  val tileSize: Int = 256
+  lazy val numTiles: Double = 1 << zoom
+  lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
+    x.toDouble / numTiles * 360d - 180d)
+  lazy val imgSize: Int = numTiles.toInt * tileSize
 
-  lazy val nextTile: Tile = Tile(x + 1, y+ 1, zoom)
-
-  lazy val latSpan: Double = math.abs(nextTile.location.lat - location.lat)
-  lazy val lonSpan: Double = math.abs(nextTile.location.lon - location.lon)
+  def fromPixelToLocation(pixel: (Int, Int)): Location =
+    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
+      pixel._1.toDouble / imgSize.toDouble * 360d - 180d)
 
   // TODO: consider refactoring image conversion to here
 }

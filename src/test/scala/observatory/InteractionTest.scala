@@ -1,6 +1,7 @@
 package observatory
 
 import org.scalacheck.{Gen, Prop}
+
 import org.scalatest.FunSuite
 import org.scalatest.prop.Checkers
 
@@ -48,36 +49,64 @@ trait InteractionTest extends FunSuite with Checkers {
     assert(tileLocation(centerTile) === loc)
   }
 
-  test("Verify that next tile is properly returned") {
-    val tile = Tile(0, 0, 2)
+  test("Test whether specific pixels in image map to proper Lat Lon") {
+    val tileX = 80
+    val tileY = 70
+    val relX = 32
+    val relY = 131
+    val z = 7
+    val tile = Tile(tileX, tileY, z)
+    val nextTile = Tile(tileX + 1, tileY + 1, z)
 
-    assert(tile.nextTile === Tile(1, 1, 2))
+    val x = tile.tileSize * tile.x + relX
+    val y = tile.tileSize * tile.y + relY
+    val pixLatLon = tile.fromPixelToLocation((x, y))
+    assert(pixLatLon.lat >= tile.location.lat )
+    assert(pixLatLon.lat < nextTile.location.lat)
+    assert(pixLatLon.lon >= tile.location.lon)
+    assert(pixLatLon.lon < nextTile.location.lon)
   }
 
-  test("Verify that tile lat span is calculated properly") {
-    val tile = Tile(0, 0, 1)
-    val tileTwo = Tile(1, 0, 1)
-
-    assert(tile.latSpan === 85.05112877980659)
-    assert(tile.lonSpan === 180.0)
-    assert(tileTwo.latSpan === 85.05112877980659)
-
-  }
-
-  test("Verify that tile lon span is calculated properly across zoom levels") {
-    val latTestGen = for {
+  test("Test whether pixels in image map to proper Lat Lon") {
+    val pixelTestGen = for {
       z <- Gen.choose(1, 19)
-      xTileOne <- Gen.choose(0, (1 << z) - 1)
-      yTileOne <- Gen.choose(0, (1 << z) - 1)
-      xTileTwo <- Gen.choose(0, (1 << z) - 1).suchThat((l: Int) => l != xTileOne)
-      yTileTwo <- Gen.choose(0, (1 << z) - 1).suchThat((l: Int) => l != yTileOne)
-    } yield (z, xTileOne, yTileOne, xTileTwo, yTileTwo)
+      tileX <- Gen.choose(0, (1 << z) - 1)
+      tileY <- Gen.choose(0, (1 << z) - 1)
+      x <- Gen.choose(0, 256)
+      y <- Gen.choose(0, 256)
+    } yield ((tileX, tileY), x, y, z)
 
-    val propChecker = Prop.forAll(latTestGen) { z =>
-      Tile(z._2, z._3, z._1).lonSpan == Tile(z._4, z._5, z._1).lonSpan
+    val propChecker = Prop.forAll(pixelTestGen) { case ((tileX: Int, tileY: Int), relX: Int, relY: Int, z: Int) =>
+      val tile = Tile(tileX, tileY, z)
+      val nextTile = Tile(tileX + 1, tileY + 1, z)
+
+      val x = tile.tileSize * tile.x + relX
+      val y = tile.tileSize * tile.y + relY
+      val pixLatLon = tile.fromPixelToLocation((x, y))
+      ((pixLatLon.lat >= tile.location.lat && pixLatLon.lat < nextTile.location.lat) &&
+        (pixLatLon.lon >= tile.location.lon && pixLatLon.lon < nextTile.location.lon))
     }
+
     propChecker.check
   }
+
+//  test("Verify that tile lon span is calculated properly across zoom levels") {
+//    val latTestGen = for {
+//      z <- Gen.choose(1, 19)
+//      xTileOne <- Gen.choose(0, (1 << z) - 1)
+//      yTileOne <- Gen.choose(0, (1 << z) - 1)
+//      xTileTwo <- Gen.choose(0, (1 << z) - 1).suchThat((l: Int) => l != xTileOne)
+//      yTileTwo <- Gen.choose(0, (1 << z) - 1).suchThat((l: Int) => l != yTileOne)
+//    } yield (z, xTileOne, yTileOne, xTileTwo, yTileTwo)
+//
+//    val propChecker = Prop.forAll(latTestGen) { z =>
+//      val tileOne = Tile(z._2, z._3, z._1)
+//      val tileTwo = Tile(z._4, z._5, z._1)
+//      val diff = math.abs(tileOne.lonSpan - tileTwo.lonSpan) / tileOne.lonSpan
+//      diff < 1e-4
+//    }
+//    propChecker.check
+//  }
 
   test("Verify tile image size") {
     val temps: Map[Location, Temperature] =
@@ -113,40 +142,40 @@ trait InteractionTest extends FunSuite with Checkers {
   // Zoom in at level 8, to center point and ensure that mean is lower than overall at zoom level 5
   // Use colors that gradually decrease in value, from white to black
 
-  test("Color value remains the same across zoom levels") {
-    val centerTile = Location(0, 0).myTile(5)
-    val centerPoint = Location(centerTile.location.lat + centerTile.latSpan / 2d,
-        centerTile.location.lon + centerTile.lonSpan / 2d)
-    val centerZoomIn = centerPoint.myTile(7)
-
-    val neighboursDiff = for {
-      latDiff <- Seq(.05, .95)
-      lonDiff <- Seq(.05, .95)
-    } yield Location(centerTile.location.lat + centerTile.latSpan * latDiff,
-      centerTile.location.lon + centerTile.lonSpan * lonDiff)
-
-    val temps: Map[Location, Temperature] = neighboursDiff.map{l => l -> 10d}.toMap ++ Map(
-      centerPoint -> 0d
-    )
-
-    val colorScale = List((-5d, Color(0, 0, 0)),
-       (0d, Color(0, 0, 255)),
-      (5d, Color(0, 255, 0)),
-      (10d, Color(255, 0, 0)))
-
-    val imageMaxZoom = tile(temps, colorScale, centerTile)
-
-    val imageMaxZoomMinTwo = tile(temps, colorScale, centerZoomIn)
-
-    val dirName = s"target"
-    val fullImg = s"${dirName}/fullImg.png"
-    val maxLevelFn = s"${dirName}/maxLevel.png"
-    val maxLevelMinTwoFn = s"${dirName}/maxMinTwoLevel.png"
-    imageMaxZoom.output(new java.io.File(maxLevelFn))
-    imageMaxZoomMinTwo.output(new java.io.File(maxLevelMinTwoFn))
-
-    Visualization.visualize(temps, colorScale).output(new java.io.File(fullImg))
-
-    assert(centerTile === tileLocation(centerTile))
-  }
+//  test("Color value remains the same across zoom levels") {
+//    val centerTile = Location(0, 0).myTile(5)
+//    val centerPoint = Location(centerTile.location.lat + centerTile.latSpan / 2d,
+//        centerTile.location.lon + centerTile.lonSpan / 2d)
+//    val centerZoomIn = centerPoint.myTile(7)
+//
+//    val neighboursDiff = for {
+//      latDiff <- Seq(.05, .95)
+//      lonDiff <- Seq(.05, .95)
+//    } yield Location(centerTile.location.lat + centerTile.latSpan * latDiff,
+//      centerTile.location.lon + centerTile.lonSpan * lonDiff)
+//
+//    val temps: Map[Location, Temperature] = neighboursDiff.map{l => l -> 10d}.toMap ++ Map(
+//      centerPoint -> 0d
+//    )
+//
+//    val colorScale = List((-5d, Color(0, 0, 0)),
+//       (0d, Color(0, 0, 255)),
+//      (5d, Color(0, 255, 0)),
+//      (10d, Color(255, 0, 0)))
+//
+//    val imageMaxZoom = tile(temps, colorScale, centerTile)
+//
+//    val imageMaxZoomMinTwo = tile(temps, colorScale, centerZoomIn)
+//
+//    val dirName = s"target"
+//    val fullImg = s"${dirName}/fullImg.png"
+//    val maxLevelFn = s"${dirName}/maxLevel.png"
+//    val maxLevelMinTwoFn = s"${dirName}/maxMinTwoLevel.png"
+//    imageMaxZoom.output(new java.io.File(maxLevelFn))
+//    imageMaxZoomMinTwo.output(new java.io.File(maxLevelMinTwoFn))
+//
+//    Visualization.visualize(temps, colorScale).output(new java.io.File(fullImg))
+//
+//    assert(centerTile === tileLocation(centerTile))
+//  }
 }
