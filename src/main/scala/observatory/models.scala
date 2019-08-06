@@ -30,11 +30,20 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   lazy val numTiles: Double = 1 << zoom
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
     x.toDouble / numTiles * 360d - 180d)
-  lazy val imgSize: Int = numTiles.toInt * tileSize
 
-  def fromPixelToLocation(pixel: (Int, Int)): Location =
-    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
-      pixel._1.toDouble / imgSize.toDouble * 360d - 180d)
+  private lazy val newNorth = y * 2
+  private lazy val newSouth = y * 2 + 1
+  private lazy val newWest = x * 2
+  private lazy val newEast = x * 2 + 1
+  lazy val subTiles: (Tile, Tile, Tile, Tile) = (Tile(newWest, newNorth, zoom + 1),
+    Tile(newEast, newNorth, zoom + 1),
+    Tile(newWest, newSouth , zoom + 1),
+    Tile(newEast, newSouth, zoom + 1)
+  )
+
+//  def fromPixelToLocation(pixel: (Int, Int)): Location =
+//    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
+//      pixel._1.toDouble / imgSize.toDouble * 360d - 180d)
 
   // TODO: consider refactoring image conversion to here
 }
