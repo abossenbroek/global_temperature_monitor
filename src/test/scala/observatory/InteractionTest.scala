@@ -1,94 +1,112 @@
 package observatory
 
-import org.scalatest.FunSuite
+import com.sksamuel.scrimage.{Pixel, PixelTools}
+import org.scalatest.{FunSuite, _}
 import org.scalatest.prop.Checkers
 
-trait InteractionTest extends FunSuite with Checkers {
-
+trait InteractionTest extends FunSuite with Checkers with Matchers {
   import Interaction._
 
-  test("tile location is properly calculated at zoom level 1") {
-    val edge11 = tileLocation(Tile(1, 1, 1))
-    assert(edge11 === Location(0, 0))
-
-    val edge01 = tileLocation(Tile(0, 1, 1))
-    assert(edge01 === Location(0, -180d))
-
-    val edge00 = tileLocation(Tile(0, 0, 1))
-    assert(edge00 === Location(85.05112877980659, -180d))
-  }
-
-  test("tile location is properly calculated at zoom level 2") {
-    val edge00 = tileLocation(Tile(0, 0, 2))
-    assert(edge00 === Location(85.05112877980659, -180d))
-
-    val edge22 = tileLocation(Tile(2, 2, 2))
-    assert(edge22 === Location(0, 0))
-
-    val edge01 = tileLocation(Tile(0, 1, 2))
-    assert(edge01 === Location(66.51326044311186, -180d))
-
-    // Ghost point necessary to calculate the edge
-    val edge44 = tileLocation(Tile(4, 4, 2))
-    assert(edge44 === Location(-85.05112877980659, 180d))
-  }
-
-  test("Lat Lon conversion to Tile and back works well") {
-    val loc = Location(0d, 0d)
-    val centerTile = loc.myTile(2)
-
-    assert(centerTile === Tile(2, 2, 2))
-  }
-
-  test("Lat Lon conversion to Tile and back works well at random point") {
-    val loc = Location(0d, 0d)
-    val centerTile = loc.myTile(5)
-
-    assert(tileLocation(centerTile) === loc)
-  }
-
-  test("Test subTiles coordinates works") {
-    val t = Tile(0, 0, 0)
-    assert(t.subTiles._1 === Tile(0, 0, 1))
-    assert(t.subTiles._2 === Tile(1, 0, 1))
-    assert(t.subTiles._3 === Tile(0, 1, 1))
-    assert(t.subTiles._4 === Tile(1, 1, 1))
-
-    val t2 = Tile(0, 0, 3)
-    assert(t2.subTiles._1 === Tile(0, 0, 4))
-    assert(t2.subTiles._2 === Tile(1, 0, 4))
-    assert(t2.subTiles._3 === Tile(0, 1, 4))
-    assert(t2.subTiles._4 === Tile(1, 1, 4))
-
-    val t3 = Tile(1, 1, 1)
-    assert(t3.subTiles._1 === Tile(2, 2, 2))
-    assert(t3.subTiles._2 === Tile(3, 2, 2))
-    assert(t3.subTiles._3 === Tile(2, 3, 2))
-    assert(t3.subTiles._4 === Tile(3, 3, 2))
-
-   val t5 = Tile(7, 7, 3)
-   assert(t5.subTiles._1 === Tile(14, 14, 4))
-   assert(t5.subTiles._2 === Tile(15, 14, 4))
-   assert(t5.subTiles._3 === Tile(14, 15, 4))
-   assert(t5.subTiles._4 === Tile(15, 15, 4))
-
-  }
-
-  test("Test subTiles spans entire range") {
-    val zoomLevel = 3
-    val res = Range(0, 1 << zoomLevel,2).map(x => {
-      Range(0, (1 << zoomLevel - 1)).map(y => {
-        val t = Tile(x, y, zoomLevel)
-        List(t.subTiles._1.x, t.subTiles._4.x)
-      }
-      ).foldLeft(List[Int]())(_++_)
+  test("Test whether TileImages at zoom level 1 can rebuild zoom level 0") {
+    def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
+      val t = Tile(x, y, zoom)
+      val img = List.fill(t.tileSize * t.tileSize)(color)
+      TileImage(t, Some(img))
     }
-    ).foldLeft(List[Int]())(_++_)
 
-    assert(res === Range(0, ((1 << (zoomLevel + 1)))))
+    val NW = createTestTileImage(0, 0, 1, PixelTools.rgb(0, 0, 0))
+    val NE = createTestTileImage(1, 0, 1, PixelTools.rgb(64, 64, 64))
+    val SW = createTestTileImage(0, 1, 1, PixelTools.rgb(128, 128, 128))
+    val SE = createTestTileImage(1, 1, 1, PixelTools.rgb(255, 255, 255))
 
+    val topLevel = TileImage(NW, NE, SW, SE)
+    val distinctPixels = topLevel.image match {
+      case Some(pl) => pl.distinct.length
+      case _ => 0}
+
+    assert(topLevel.x === 0)
+    assert(topLevel.y === 0)
+    assert(topLevel.zoom === 0)
+    assert(distinctPixels === 4)
   }
 
+  test("Whether center of tile is properly calculated") {
+    val t = Tile(0, 0, 0)
+    val center = centerOfTile(t)
+
+    assert(center ~= Location(0, 0))
+  }
+
+  test("Test whether TileImages depth level 0 and 1 works") {
+    def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
+      val t = Tile(x, y, zoom)
+      val img = List.fill(t.tileSize * t.tileSize)(color)
+      TileImage(t, Some(img))
+    }
+
+    val NW = createTestTileImage(0, 0, 1, PixelTools.rgb(0, 0, 0))
+    val NE = createTestTileImage(1, 0, 1, PixelTools.rgb(64, 64, 64))
+    val SW = createTestTileImage(0, 1, 1, PixelTools.rgb(128, 128, 128))
+    val SE = createTestTileImage(1, 1, 1, PixelTools.rgb(255, 255, 255))
+
+    val topLevel = TileImage(NW, NE, SW, SE)
+
+    assert(topLevel.depth === 1)
+    assert(NE.depth === 0)
+  }
+
+
+  test("Test whether empty initial node can be grown to depth 1") {
+    val topLevel = TileImage(Tile(0, 0, 0), None)
+
+    val depthOne = topLevel.grow(1)
+
+    assert(depthOne.depth === 1)
+
+    def child(childNode: Option[TileImage]): TileImage = childNode match {
+      case Some(n) => n
+      case _ => TileImage(Tile(0, 0, 0), None)
+    }
+
+    assert(child(depthOne.NW).t === Tile(0, 0, 1))
+    assert(child(depthOne.NE).t === Tile(1, 0, 1))
+    assert(child(depthOne.SW).t === Tile(0, 1, 1))
+    assert(child(depthOne.SE).t === Tile(1, 1, 1))
+  }
+
+  test("Test whether empty initial node can be grown to depth 2") {
+    val topLevel = TileImage(Tile(0, 0, 0), None)
+
+    val depthTwo = topLevel.grow(2)
+
+    assert(depthTwo.depth === 2)
+
+    def child(childNode: Option[TileImage]): TileImage = childNode match {
+      case Some(n) => n
+      case _ => TileImage(Tile(0, 0, 0), None)
+    }
+
+    assert(child(depthTwo.NW).depth === 1)
+    assert(child(child(depthTwo.NW).NW).t === Tile(0, 0, 2))
+    assert(child(child(depthTwo.NW).NE).t === Tile(1, 0, 2))
+    assert(child(child(depthTwo.NW).SW).t === Tile(0, 1, 2))
+    assert(child(child(depthTwo.NW).SE).t === Tile(1, 1, 2))
+
+    assert(child(child(depthTwo.NE).NW).t === Tile(2, 0, 2))
+    assert(child(child(depthTwo.NE).NE).t === Tile(3, 0, 2))
+    assert(child(child(depthTwo.NE).SW).t === Tile(2, 1, 2))
+    assert(child(child(depthTwo.NE).SE).t === Tile(3, 1, 2))
+
+    assert(child(child(depthTwo.SW).NW).t === Tile(0, 2, 2))
+    assert(child(child(depthTwo.SW).NE).t === Tile(1, 2, 2))
+    assert(child(child(depthTwo.SW).SW).t === Tile(0, 3, 2))
+    assert(child(child(depthTwo.SW).SE).t === Tile(1, 3, 2))
+
+    assert(child(child(depthTwo.SE).NW).t === Tile(2, 2, 2))
+    assert(child(child(depthTwo.SE).NE).t === Tile(3, 2, 2))
+    assert(child(child(depthTwo.SE).SW).t === Tile(2, 3, 2))
+    assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
+  }
 
 //  test("Test whether pixels in image map to proper Lat Lon") {
 //    val pixelTestGen = for {

@@ -17,13 +17,117 @@ object Interaction {
     tile.location
   }
 
-  def newSlippyTileCoord(tile: Tile): (Int, Int, Int, Int) = {
-    val newNorth = tile.y * 2
-    val newSouth = tile.y * 2 + 1
-    val newWest = tile.x * 2
-    val newEast = tile.x * 2 + 1
-    (newNorth, newSouth, newWest, newEast)
+  def combineTiles(NW: List[Pixel], NE: List[Pixel], SW: List[Pixel], SE: List[Pixel]) : List[Pixel] = {
+    def combineCubes(a: List[Pixel], b: List[Pixel]): List[Pixel] = {
+      val height = math.sqrt(a.length).toInt
+      Range(0, height).map{i => {
+        val start = i * height
+        val end = (i + 1) * height
+        a.slice(start, end) ++ b.slice(start, end)
+      }
+      }.foldLeft(List[Pixel]())(_++_)
+    }
+
+    val top = combineCubes(NW, NE)
+    val bottom = combineCubes(SW, SE)
+    top ++ bottom
   }
+
+  case class InvalidTiles() extends Exception()
+  case class InvalidTree() extends Exception()
+
+  case class TileImage(t: Tile,
+                       image: Option[List[Pixel]],
+                       NW: Option[TileImage],
+                       NE: Option[TileImage],
+                       SW: Option[TileImage],
+                       SE: Option[TileImage]) {
+    lazy val zoom: Int = t.zoom
+    lazy val x: Int = t.x
+    lazy val y: Int = t.y
+    lazy val location: Location = t.location
+
+    def depth(): Int = (NW, NE, SW, SE) match {
+      case (Some(nw), Some(ne), Some(sw), Some(se)) => 1 + List[Int](nw.depth, ne.depth, sw.depth, se.depth).min
+      case _ => 0
+    }
+
+    def grow(levels: Int): TileImage = (levels, NW, NE, SW, SE) match {
+      case (0, _, _, _, _) =>  this
+      case (i, None, None, None, None) =>
+        val newLevels = i - 1
+        val NW = TileImage(Tile(t.x * 2, t.y * 2, t.zoom + 1), None).grow(newLevels)
+        val NE = TileImage(Tile(t.x * 2 + 1, t.y * 2, t.zoom + 1), None).grow(newLevels)
+        val SW = TileImage(Tile(t.x * 2, t.y * 2 + 1, t.zoom + 1), None).grow(newLevels)
+        val SE = TileImage(Tile(t.x * 2 + 1, t.y * 2 + 1, t.zoom + 1), None).grow(newLevels)
+
+        new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE))
+      case (i, Some(nw), Some(ne), Some(sw), Some(se)) =>
+        val newLevels = i -1
+        val NW = nw.grow(newLevels)
+        val NE = ne.grow(newLevels)
+        val SW = sw.grow(newLevels)
+        val SE = se.grow(newLevels)
+
+        new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE))
+      case _ => throw new InvalidTree
+    }
+  }
+
+  object TileImage {
+    def apply(NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage = {
+      if (!(((NW.x + 1) == NE.x) && ((NW.y + 1) == SW.y) && (NW.y == NE.y) && (SW.y == SE.y) && (SW.x + 1) == SE.x)) {
+        throw new InvalidTiles()
+      }
+      val t = Tile(NW.x / 2, NW.y / 2, NW.zoom - 1)
+      val image = (NW.image, NE.image, SW.image, SE.image) match {
+        case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+          Some(combineTiles(nw, ne, sw, se))
+        case _ =>
+          None
+      }
+      new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE))
+    }
+
+    def apply(t: Tile, image: Option[List[Pixel]]): TileImage = {
+      new TileImage(t, image, None, None, None, None)
+    }
+
+
+
+//    def grow(depths: Int, t: Tile): TileImage = depths match {
+//      case 0 => {
+//        val bottomRight = Tile(t.x + 1, t.y + 1, t.zoom)
+//        val centerLat = (t.location.lat - bottomRight.lat) / 2d + t.location.lat
+//        val centerLon = (t.location.lon - bottomRight.lon) / 2d + t.location.lon
+//        val center = Location(centerLat, centerLon)
+//
+//        val nw = TileImage(Tile(t.x * 2, t.y * 2, t.zoom + 1), None, t.topLeft, center)
+//        val ne = TileImage(Tile(t.x * 2 + 1, t.y * 2, t.zoom + 1), None,
+//          Location(t.topLeft.lat, centerLon),
+//          Location(centerLat, t.bottomRight.lon))
+//        val sw = TileImage(Tile(t.x * 2, t.y * 2 + 1, t.zoom + 1), None,
+//          Location(centerLat, t.topLeft.lon),
+//          Location(t.bottomRight.lat, centerLon))
+//        val se = TileImage(Tile(t.x * 2 + 1, t.y * 2 + 1, t.zoom + 1), None,
+//          center,
+//          t.bottomRight)
+//
+//        new TileImage(t.t, Some(nw), Some(ne), Some(sw), Some(se), t.topLeft, t.bottomRight)
+//      }
+//
+//    }
+  }
+
+  def centerOfTile(t: Tile): Location = {
+    val latSlope = (GlobalCoordinates.TopLeft.lat - GlobalCoordinates.BottomRight.lat) / t.numTiles
+    val lonSlope = -(GlobalCoordinates.TopLeft.lon - GlobalCoordinates.BottomRight.lon) / t.numTiles
+    val centerLat = GlobalCoordinates.TopLeft.lat - (t.y + 0.5) * latSlope
+    val centerLon = GlobalCoordinates.TopLeft.lon + (t.x + 0.5) * lonSlope
+    Location(centerLat, centerLon)
+  }
+  
+  
 
   /**
     * @param temperatures Known temperatures
@@ -82,6 +186,7 @@ object Interaction {
       (255,205,243),
       (255,255,255)
     )
+
     // TODO: write recursive function that builds tile from smaller tiles
     // TODO: write smallest tile function that either builds a single pixel in image or maps (x,y) to mercator lat, lon, to plot
     // TODO: write small caching to ensure tiles are not all recomputed
@@ -93,27 +198,13 @@ object Interaction {
         println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} have index $index")
         List.fill(tile.tileSize * tile.tileSize)(PixelTools.rgb(palette(index)._1, palette(index)._2, palette(index)._3))
       } else {
-        val (newNorth, newSouth, newWest, newEast) = newSlippyTileCoord(tile)
+        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} dividing into")
+        val northWest = generateTile(tile.NW, maxZoomLevel)
+        val northEast = generateTile(tile.NE, maxZoomLevel)
+        val southWest = generateTile(tile.SW, maxZoomLevel)
+        val southEast = generateTile(tile.SE, maxZoomLevel)
 
-        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} dividing into ($newNorth, $newWest) ($newNorth, $newEast), ($newSouth, $newWest), ($newSouth, $newEast)")
-        val northWest = generateTile(Tile(newNorth, newWest, tile.zoom + 1), maxZoomLevel=maxZoomLevel)
-        val northEast = generateTile(Tile(newNorth, newEast, tile.zoom + 1), maxZoomLevel=maxZoomLevel)
-        val southWest = generateTile(Tile(newSouth, newWest, tile.zoom + 1), maxZoomLevel=maxZoomLevel)
-        val southEast = generateTile(Tile(newSouth, newEast, tile.zoom + 1), maxZoomLevel=maxZoomLevel)
-
-        def combineCubes(a: List[Pixel], b: List[Pixel]): List[Pixel] = {
-          val height = math.sqrt(a.length).toInt
-          Range(0, height).map{i => {
-            val start = i * height
-            val end = (i + 1) * height
-            a.slice(start, end) ++ b.slice(start, end)
-          }
-          }.foldLeft(List[Pixel]())(_++_)
-          }
-
-        val top = combineCubes(northWest, northEast)
-        val bottom = combineCubes(southWest, southEast)
-       top ++ bottom
+        combineTiles(northWest, northEast, southWest, southEast)
       }
     }
 
@@ -130,7 +221,7 @@ object Interaction {
 //      Pixel(PixelTools.rgb(0, 0, 0))
 //    }
 //    }
-    val imgArray = generateTile(tile, maxZoomLevel = 2) .toArray
+    val imgArray = generateTile(tile, maxZoomLevel = 3) .toArray
     val width = math.sqrt(imgArray.length)
 
     val img = Image(width.toInt, width.toInt, imgArray)
@@ -203,7 +294,7 @@ object Interaction {
       (60d, Color(255, 255, 255)))
 
     //TODO: change tile
-    val img = tile(temperatures, colorScale, Tile(0,0,0))
+    val img = tile(temperatures, colorScale, tileToSave)
     val dirName = s"target/temperatures/$year/${tileToSave.zoom}"
     val pathName = s"$dirName/${tileToSave.x}-${tileToSave.y}.png"
     val success = (new File(dirName)).mkdirs

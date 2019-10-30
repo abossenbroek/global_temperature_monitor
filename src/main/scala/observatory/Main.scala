@@ -21,7 +21,7 @@ object Main extends App with LazyLogging {
       ////   "/temperature_test.csv")
       //   //"src/main/resources/stations.csv",
       //  // "src/main/resources/[12]*.csv")
-      "/1989.csv")
+      "/1975.csv")
 
     logger.info("Extracting temperatures")
     val temps = Extraction.locationYearlyAverageRecords(temp1989)

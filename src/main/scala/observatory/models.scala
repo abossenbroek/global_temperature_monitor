@@ -7,15 +7,18 @@ package observatory
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
 case class Location(lat: Double, lon: Double) {
-  def myTile(zoom: Int): Tile = {
-    val n: Double = 1 << zoom
-    val xTile = (lon + 180d) / 360d * n
-    val latRad = math.toRadians(lat)
-    val yTile = (1d - math.log(math.tan(latRad) + (1 / math.cos(latRad))) / math.Pi) / 2.0 * n
-
-    Tile(xTile.toInt, yTile.toInt, zoom)
-  }
+  def <=(that: Location): Boolean = lat <= that.lat && lon <= that.lon
+  def <(that: Location): Boolean = lat < that.lat && lon < that.lon
+  def >(that: Location): Boolean = lat > that.lat && lon > that.lon
+  def >=(that: Location): Boolean = lat >= that.lat && lon >= that.lon
+  def ~=(that: Location): Boolean = math.abs(lat - that.lat) < 1e-3 && math.abs(lon - that.lon) < 1e-3
 }
+
+object GlobalCoordinates {
+  val TopLeft = Location(85.0511, -180)
+  val BottomRight = Location(-85.0511, 180)
+}
+
 
 /**
   * Introduced in Week 3. Represents a tiled web map tile.
@@ -26,7 +29,7 @@ case class Location(lat: Double, lon: Double) {
   * @param zoom Zoom level, 0 ≤ zoom ≤ 19
   */
 case class Tile(x: Int, y: Int, zoom: Int) {
-  val tileSize: Int = 256
+  val tileSize = 256
   lazy val numTiles: Double = 1 << zoom
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
     x.toDouble / numTiles * 360d - 180d)
@@ -35,11 +38,10 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   private lazy val newSouth = y * 2 + 1
   private lazy val newWest = x * 2
   private lazy val newEast = x * 2 + 1
-  lazy val subTiles: (Tile, Tile, Tile, Tile) = (Tile(newWest, newNorth, zoom + 1),
-    Tile(newEast, newNorth, zoom + 1),
-    Tile(newWest, newSouth , zoom + 1),
-    Tile(newEast, newSouth, zoom + 1)
-  )
+  lazy val NW = Tile(newNorth, newWest, zoom + 1)
+  lazy val NE = Tile(newNorth, newEast, zoom + 1)
+  lazy val SW = Tile(newSouth, newWest, zoom + 1)
+  lazy val SE = Tile(newSouth, newEast, zoom + 1)
 
 //  def fromPixelToLocation(pixel: (Int, Int)): Location =
 //    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
