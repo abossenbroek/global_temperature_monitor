@@ -40,7 +40,7 @@ object Interaction {
     new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE), None)
 
   def tileImageWithApplicableTemps(ti: TileImage, temperatures: List[(Location, Temperature)]): TileImage =
-    ti.insert(temperatures.filter{temp => ti.location > temp._1 && temp._1 > ti.bottomRight})
+    ti.insert(temperatures.filter{temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight})
 
   case class TileImage(t: Tile,
                        image: Option[List[Pixel]],

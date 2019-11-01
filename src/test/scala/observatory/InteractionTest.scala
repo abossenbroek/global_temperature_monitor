@@ -7,6 +7,16 @@ import org.scalatest.prop.Checkers
 trait InteractionTest extends FunSuite with Checkers with Matchers {
   import Interaction._
 
+  def child(childNode: Option[TileImage]): TileImage = childNode match {
+    case Some(n) => n
+    case _ => TileImage(Tile(0, 0, 0))
+  }
+
+  test("Test boolean operators of Location") {
+    assert(Location(85, -180) > Location(-85, 180), "Location(85, -180) > Location(-85, 180) should hold")
+    assert(Location(-85, 180) < Location(85, -180), "Location(-85, 180) < Location(85, -180) should hold")
+  }
+
   test("Test whether TileImages at zoom level 1 can rebuild zoom level 0") {
     def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
       val t = Tile(x, y, zoom)
@@ -55,7 +65,6 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(NE.depth === 0)
   }
 
-
   test("Test whether empty initial node can be grown to depth 1") {
     val topLevel = TileImage(Tile(0, 0, 0), None)
 
@@ -63,16 +72,38 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 
     assert(depthOne.depth === 1)
 
-    def child(childNode: Option[TileImage]): TileImage = childNode match {
-      case Some(n) => n
-      case _ => TileImage(Tile(0, 0, 0), None)
-    }
-
     assert(child(depthOne.NW).t === Tile(0, 0, 1))
     assert(child(depthOne.NE).t === Tile(1, 0, 1))
     assert(child(depthOne.SW).t === Tile(0, 1, 1))
     assert(child(depthOne.SE).t === Tile(1, 1, 1))
   }
+
+  test("Test whether empty initial node can be grown to depth 1 with bottom corners") {
+    val depthOne = TileImage(Tile(0, 0, 0)).grow(1)
+
+    assert(depthOne.depth === 1)
+
+    def testBottom(name: String, c: Option[TileImage], x: Int, y: Int): Unit = {
+      assert(child(c).bottomRight ~= Tile(x, y, 1).location,
+        f"$name ${child(c).bottomRight} is not ${Tile(x, y,1).location} ")
+    }
+
+    def testBottomLocation(name: String, c: Option[TileImage], lat: Double, lon: Double): Unit = {
+      assert(child(c).bottomRight ~= Location(lat, lon),
+        f"$name ${child(c).bottomRight} is not ${Location(lat, lon)} ")
+    }
+
+    testBottom("NW", depthOne.NW, 1, 1)
+    testBottom("NE", depthOne.NE, 2, 1)
+    testBottom("SW", depthOne.SW, 1, 2)
+    testBottom("SE", depthOne.SE, 2, 2)
+
+    testBottomLocation("NW", depthOne.NW, 0, 0)
+    testBottomLocation("NE", depthOne.NE, 0, 180)
+    testBottomLocation("SW", depthOne.SW, -85.05113, 0)
+    testBottomLocation("SE", depthOne.SE, -85.05113, 180)
+  }
+
 
   test("Test whether empty initial node can be grown to depth 2") {
     val topLevel = TileImage(Tile(0, 0, 0), None)
@@ -108,11 +139,6 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
   }
 
-  test("Test boolean operators of Location") {
-    assert(Location(85, -180) > Location(-85, 180), "Location(85, -180) > Location(-85, 180) should hold")
-    assert(Location(-85, 180) < Location(85, -180), "Location(-85, 180) < Location(85, -180) should hold")
-  }
-
   test("Test whether new TileImage with applicable temperatures works") {
     val testX = 0
     val testY = 0
@@ -137,6 +163,65 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     }
 
     assert(tempsInTile.length === tempsIn.length)
+  }
+
+  test("Test whether insert into zoom 1 tree works") {
+    val ti = TileImage(Tile(0, 0, 0)).grow(1)
+
+    val testTemps = List[(Location, Temperature)](
+      (Location(80d, -179), 20d), // should end up in NW
+      (Location(60d, 10d), 30d), // should end up in NE
+      (Location(-60d, -170d), 10d), // should end up in SW
+      (Location(-60d, 179d), 10d) // should end up in SE
+    )
+
+    val tiWithTemps = ti.insert(testTemps)
+
+    def tempsInTileImage(ti: TileImage): List[(Location, Temperature)] = ti.temperatures match {
+      case Some(temps) => temps.toList
+      case _ => List[(Location, Temperature)]()
+    }
+
+    assert(tempsInTileImage(child(tiWithTemps.NW)).length === 1,
+      f"NW has ${tempsInTileImage(child(tiWithTemps.NW))} members of $testTemps" ++
+        f" with child: ${child(tiWithTemps.NW).location} and bottom ${child(tiWithTemps.NW).bottomRight}")
+    assert(tempsInTileImage(child(tiWithTemps.NE)).length === 1,
+      f"NE has ${tempsInTileImage(child(tiWithTemps.NE))} members of $testTemps" ++
+        f" with child: ${child(tiWithTemps.NE).location} and bottom ${child(tiWithTemps.NE).bottomRight}")
+    assert(tempsInTileImage(child(tiWithTemps.SW)).length === 1,
+      f"SW has ${tempsInTileImage(child(tiWithTemps.SW))} members for $testTemps" ++
+        f" with child: ${child(tiWithTemps.SW).location} and bottom ${child(tiWithTemps.SW).bottomRight}")
+    assert(tempsInTileImage(child(tiWithTemps.SE)).length === 1,
+      f"SE has ${tempsInTileImage(child(tiWithTemps.SE))} members for $testTemps" ++
+    f" with child: ${child(tiWithTemps.SE).location} and bottom ${child(tiWithTemps.SE).bottomRight}")
+  }
+
+  test("Test whether insert into zoom 1 tree works with edge cases") {
+    val ti = TileImage(Tile(0, 0, 0)).grow(1)
+
+    val testTemps = List[(Location, Temperature)](
+      (Tile(0,0, 1).location, 20d), // should end up in NW
+      (Tile(1, 0, 1).location, 30d), // should end up in NE
+      (Tile(0, 1, 1).location, 10d), // should end up in SE
+      (Tile(1, 1, 1).location, 10d) // should end up in SW
+    )
+
+    val tiWithTemps = ti.insert(testTemps)
+
+    def tempsInTileImage(ti: TileImage): List[(Location, Temperature)] = ti.temperatures match {
+      case Some(temps) => temps.toList
+      case _ => List[(Location, Temperature)]()
+    }
+
+    def testLengthTemps(name: String, c: Option[TileImage]): Unit = {
+      assert(tempsInTileImage(child(c)).length === 1,
+        f"$name has ${tempsInTileImage(child(c))} members of $testTemps")
+    }
+
+    testLengthTemps("NW", tiWithTemps.NW)
+    testLengthTemps("NE", tiWithTemps.NE)
+    testLengthTemps("SW", tiWithTemps.SW)
+    testLengthTemps("SE", tiWithTemps.SE)
   }
 
 //  test("Test whether pixels in image map to proper Lat Lon") {
