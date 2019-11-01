@@ -36,16 +36,24 @@ object Interaction {
   case class InvalidTiles() extends Exception()
   case class InvalidTree() extends Exception()
 
+  def tileImageWithChildren(t: Tile, NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage =
+    new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE), None)
+
+  def tileImageWithApplicableTemps(ti: TileImage, temperatures: List[(Location, Temperature)]): TileImage =
+    ti.insert(temperatures.filter{temp => ti.location > temp._1 && temp._1 > ti.bottomRight})
+
   case class TileImage(t: Tile,
                        image: Option[List[Pixel]],
                        NW: Option[TileImage],
                        NE: Option[TileImage],
                        SW: Option[TileImage],
-                       SE: Option[TileImage]) {
+                       SE: Option[TileImage],
+                       temperatures: Option[Iterable[(Location, Temperature)]]) {
     lazy val zoom: Int = t.zoom
     lazy val x: Int = t.x
     lazy val y: Int = t.y
     lazy val location: Location = t.location
+    lazy val bottomRight: Location = Tile(x + 1, y + 1, zoom).location
 
     def depth(): Int = (NW, NE, SW, SE) match {
       case (Some(nw), Some(ne), Some(sw), Some(se)) => 1 + List[Int](nw.depth, ne.depth, sw.depth, se.depth).min
@@ -60,16 +68,25 @@ object Interaction {
         val NE = TileImage(Tile(t.x * 2 + 1, t.y * 2, t.zoom + 1), None).grow(newLevels)
         val SW = TileImage(Tile(t.x * 2, t.y * 2 + 1, t.zoom + 1), None).grow(newLevels)
         val SE = TileImage(Tile(t.x * 2 + 1, t.y * 2 + 1, t.zoom + 1), None).grow(newLevels)
-
-        new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE))
+        tileImageWithChildren(t, NW, NE, SW, SE)
       case (i, Some(nw), Some(ne), Some(sw), Some(se)) =>
         val newLevels = i -1
         val NW = nw.grow(newLevels)
         val NE = ne.grow(newLevels)
         val SW = sw.grow(newLevels)
         val SE = se.grow(newLevels)
+        tileImageWithChildren(t, NW, NE, SW, SE)
+      case _ => throw new InvalidTree
+    }
 
-        new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE))
+
+    def insert(temperatures: List[(Location, Temperature)]): TileImage = (NW, NE, SW, SE) match {
+      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+        TileImage(tileImageWithApplicableTemps(nw, temperatures),
+          tileImageWithApplicableTemps(ne, temperatures),
+          tileImageWithApplicableTemps(sw, temperatures),
+          tileImageWithApplicableTemps(se, temperatures))
+      case (None, None, None, None) => this.copy(temperatures = Some(temperatures))
       case _ => throw new InvalidTree
     }
   }
@@ -77,7 +94,7 @@ object Interaction {
   object TileImage {
     def apply(NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage = {
       if (!(((NW.x + 1) == NE.x) && ((NW.y + 1) == SW.y) && (NW.y == NE.y) && (SW.y == SE.y) && (SW.x + 1) == SE.x)) {
-        throw new InvalidTiles()
+        throw InvalidTiles()
       }
       val t = Tile(NW.x / 2, NW.y / 2, NW.zoom - 1)
       val image = (NW.image, NE.image, SW.image, SE.image) match {
@@ -86,13 +103,20 @@ object Interaction {
         case _ =>
           None
       }
-      new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE))
+      new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE), None)
     }
 
     def apply(t: Tile, image: Option[List[Pixel]]): TileImage = {
-      new TileImage(t, image, None, None, None, None)
+      new TileImage(t, image, None, None, None, None, None)
     }
 
+    def apply(ti: TileImage, temperatures: List[(Location, Temperature)]): TileImage = {
+      new TileImage(ti.t, ti.image, ti.NW, ti.NE, ti.SW, ti.SE, Some(temperatures))
+    }
+
+    def apply(t: Tile): TileImage = {
+      new TileImage(t, None, None, None, None, None, None)
+    }
 
 
 //    def grow(depths: Int, t: Tile): TileImage = depths match {

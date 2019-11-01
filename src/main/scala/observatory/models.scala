@@ -7,10 +7,10 @@ package observatory
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
 case class Location(lat: Double, lon: Double) {
-  def <=(that: Location): Boolean = lat <= that.lat && lon <= that.lon
-  def <(that: Location): Boolean = lat < that.lat && lon < that.lon
-  def >(that: Location): Boolean = lat > that.lat && lon > that.lon
-  def >=(that: Location): Boolean = lat >= that.lat && lon >= that.lon
+  def <~=(that: Location): Boolean = (this < that) || (this ~= that)
+  def <(that: Location): Boolean = lat < that.lat && lon > that.lon
+  def >(that: Location): Boolean = lat > that.lat && lon < that.lon
+  def >~=(that: Location): Boolean = (this > that) || (this ~= that)
   def ~=(that: Location): Boolean = math.abs(lat - that.lat) < 1e-3 && math.abs(lon - that.lon) < 1e-3
 }
 

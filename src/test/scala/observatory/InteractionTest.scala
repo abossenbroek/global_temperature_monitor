@@ -108,6 +108,37 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
   }
 
+  test("Test boolean operators of Location") {
+    assert(Location(85, -180) > Location(-85, 180), "Location(85, -180) > Location(-85, 180) should hold")
+    assert(Location(-85, 180) < Location(85, -180), "Location(-85, 180) < Location(85, -180) should hold")
+  }
+
+  test("Test whether new TileImage with applicable temperatures works") {
+    val testX = 0
+    val testY = 0
+    val testZoom = 1
+    val ti = TileImage(Tile(testX, testY, testZoom))
+
+    val tempsIn = List[(Location, Temperature)]((Location(80, -179), -20d),
+      (Location(65, -170), -30d)
+    )
+
+    val tempsOut = List[(Location, Temperature)](
+      (Tile(testX + 1, testY + 1, testZoom).location, 20d),
+      (Tile(testX + 1, testY, testZoom).location, 30d),
+      (Tile(testX, testY + 1, testZoom).location, 10d),
+      (Location(180, 85), 10d)
+    )
+
+    val tiWithTemp = tileImageWithApplicableTemps(ti, tempsIn ++ tempsOut)
+    val tempsInTile: List[(Location, Temperature)] = tiWithTemp.temperatures match {
+      case Some(temps) => temps.toList
+      case _ => List[(Location, Temperature)]()
+    }
+
+    assert(tempsInTile.length === tempsIn.length)
+  }
+
 //  test("Test whether pixels in image map to proper Lat Lon") {
 //    val pixelTestGen = for {
 //      z <- Gen.choose(1, 19)
