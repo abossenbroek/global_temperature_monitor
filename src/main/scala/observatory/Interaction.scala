@@ -37,18 +37,17 @@ object Interaction {
   case class InvalidTree() extends Exception()
 
   def tileImageWithChildren(t: Tile, NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage =
-    new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE), None)
+    new TileImage(t, None, Some(NW), Some(NE), Some(SW), Some(SE))
 
-  def tileImageWithApplicableTemps(ti: TileImage, temperatures: List[(Location, Temperature)]): TileImage =
-    ti.insert(temperatures.filter{temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight})
+  def tempsApplicableToTile(ti: TileImage, temperatures: Iterable[(Location, Temperature)]): Iterable[(Location, Temperature)] =
+    temperatures.filter{temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight}
 
   case class TileImage(t: Tile,
                        image: Option[List[Pixel]],
                        NW: Option[TileImage],
                        NE: Option[TileImage],
                        SW: Option[TileImage],
-                       SE: Option[TileImage],
-                       temperatures: Option[Iterable[(Location, Temperature)]]) {
+                       SE: Option[TileImage]) {
     lazy val zoom: Int = t.zoom
     lazy val x: Int = t.x
     lazy val y: Int = t.y
@@ -79,16 +78,6 @@ object Interaction {
       case _ => throw new InvalidTree
     }
 
-
-    def insert(temperatures: List[(Location, Temperature)]): TileImage = (NW, NE, SW, SE) match {
-      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
-        TileImage(tileImageWithApplicableTemps(nw, temperatures),
-          tileImageWithApplicableTemps(ne, temperatures),
-          tileImageWithApplicableTemps(sw, temperatures),
-          tileImageWithApplicableTemps(se, temperatures))
-      case (None, None, None, None) => this.copy(temperatures = Some(temperatures))
-      case _ => throw new InvalidTree
-    }
   }
 
   object TileImage {
@@ -103,19 +92,16 @@ object Interaction {
         case _ =>
           None
       }
-      new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE), None)
+      new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE))
     }
 
     def apply(t: Tile, image: Option[List[Pixel]]): TileImage = {
-      new TileImage(t, image, None, None, None, None, None)
+      new TileImage(t, image, None, None, None, None)
     }
 
-    def apply(ti: TileImage, temperatures: List[(Location, Temperature)]): TileImage = {
-      new TileImage(ti.t, ti.image, ti.NW, ti.NE, ti.SW, ti.SE, Some(temperatures))
-    }
 
     def apply(t: Tile): TileImage = {
-      new TileImage(t, None, None, None, None, None, None)
+      new TileImage(t, None, None, None, None, None)
     }
 
 

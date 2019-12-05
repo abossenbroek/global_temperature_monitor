@@ -139,33 +139,33 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
   }
 
-  test("Test whether new TileImage with applicable temperatures works") {
-    val testX = 0
-    val testY = 0
-    val testZoom = 1
-    val ti = TileImage(Tile(testX, testY, testZoom))
+//  test("Test whether new TileImage with applicable temperatures works") {
+//    val testX = 0
+//    val testY = 0
+//    val testZoom = 1
+//    val ti = TileImage(Tile(testX, testY, testZoom))
+//
+//    val tempsIn = List[(Location, Temperature)]((Location(80, -179), -20d),
+//      (Location(65, -170), -30d)
+//    )
+//
+//    val tempsOut = List[(Location, Temperature)](
+//      (Tile(testX + 1, testY + 1, testZoom).location, 20d),
+//      (Tile(testX + 1, testY, testZoom).location, 30d),
+//      (Tile(testX, testY + 1, testZoom).location, 10d),
+//      (Location(180, 85), 10d)
+//    )
+//
+//    val tiWithTemp = tileImageWithApplicableTemps(ti, tempsIn ++ tempsOut)
+//    val tempsInTile: List[(Location, Temperature)] = tiWithTemp.temperatures match {
+//      case Some(temps) => temps.toList
+//      case _ => List[(Location, Temperature)]()
+//    }
+//
+//    assert(tempsInTile.length === tempsIn.length)
+//  }
 
-    val tempsIn = List[(Location, Temperature)]((Location(80, -179), -20d),
-      (Location(65, -170), -30d)
-    )
-
-    val tempsOut = List[(Location, Temperature)](
-      (Tile(testX + 1, testY + 1, testZoom).location, 20d),
-      (Tile(testX + 1, testY, testZoom).location, 30d),
-      (Tile(testX, testY + 1, testZoom).location, 10d),
-      (Location(180, 85), 10d)
-    )
-
-    val tiWithTemp = tileImageWithApplicableTemps(ti, tempsIn ++ tempsOut)
-    val tempsInTile: List[(Location, Temperature)] = tiWithTemp.temperatures match {
-      case Some(temps) => temps.toList
-      case _ => List[(Location, Temperature)]()
-    }
-
-    assert(tempsInTile.length === tempsIn.length)
-  }
-
-  test("Test whether insert into zoom 1 tree works") {
+  test("Test whether temperature filter properly works") {
     val ti = TileImage(Tile(0, 0, 0)).grow(1)
 
     val testTemps = List[(Location, Temperature)](
@@ -175,25 +175,22 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
       (Location(-60d, 179d), 10d) // should end up in SE
     )
 
-    val tiWithTemps = ti.insert(testTemps)
 
-    def tempsInTileImage(ti: TileImage): List[(Location, Temperature)] = ti.temperatures match {
-      case Some(temps) => temps.toList
-      case _ => List[(Location, Temperature)]()
-    }
+    def tempsInTileImage(ti: Option[TileImage]): List[(Location, Temperature)] =
+      tempsApplicableToTile(child(ti), testTemps).toList
 
-    assert(tempsInTileImage(child(tiWithTemps.NW)).length === 1,
-      f"NW has ${tempsInTileImage(child(tiWithTemps.NW))} members of $testTemps" ++
-        f" with child: ${child(tiWithTemps.NW).location} and bottom ${child(tiWithTemps.NW).bottomRight}")
-    assert(tempsInTileImage(child(tiWithTemps.NE)).length === 1,
-      f"NE has ${tempsInTileImage(child(tiWithTemps.NE))} members of $testTemps" ++
-        f" with child: ${child(tiWithTemps.NE).location} and bottom ${child(tiWithTemps.NE).bottomRight}")
-    assert(tempsInTileImage(child(tiWithTemps.SW)).length === 1,
-      f"SW has ${tempsInTileImage(child(tiWithTemps.SW))} members for $testTemps" ++
-        f" with child: ${child(tiWithTemps.SW).location} and bottom ${child(tiWithTemps.SW).bottomRight}")
-    assert(tempsInTileImage(child(tiWithTemps.SE)).length === 1,
-      f"SE has ${tempsInTileImage(child(tiWithTemps.SE))} members for $testTemps" ++
-    f" with child: ${child(tiWithTemps.SE).location} and bottom ${child(tiWithTemps.SE).bottomRight}")
+    assert(tempsInTileImage(ti.NW).length === 1,
+      f"NW has ${tempsInTileImage(ti.NW)} members of $testTemps" ++
+        f" with child: ${child(ti.NW).location} and bottom ${child(ti.NW).bottomRight}")
+    assert(tempsInTileImage(ti.NE).length === 1,
+      f"NE has ${tempsInTileImage(ti.NE)} members of $testTemps" ++
+        f" with child: ${child(ti.NE).location} and bottom ${child(ti.NE).bottomRight}")
+    assert(tempsInTileImage(ti.SW).length === 1,
+      f"SW has ${tempsInTileImage(ti.SW)} members for $testTemps" ++
+        f" with child: ${child(ti.SW).location} and bottom ${child(ti.SW).bottomRight}")
+    assert(tempsInTileImage(ti.SE).length === 1,
+      f"SE has ${tempsInTileImage(ti.SE)} members for $testTemps" ++
+    f" with child: ${child(ti.SE).location} and bottom ${child(ti.SE).bottomRight}")
   }
 
   test("Test whether insert into zoom 1 tree works with edge cases") {
@@ -206,22 +203,19 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
       (Tile(1, 1, 1).location, 10d) // should end up in SW
     )
 
-    val tiWithTemps = ti.insert(testTemps)
+    def tempsInTileImage(ti: Option[TileImage]): List[(Location, Temperature)] =
+      tempsApplicableToTile(child(ti), testTemps).toList
 
-    def tempsInTileImage(ti: TileImage): List[(Location, Temperature)] = ti.temperatures match {
-      case Some(temps) => temps.toList
-      case _ => List[(Location, Temperature)]()
-    }
 
     def testLengthTemps(name: String, c: Option[TileImage]): Unit = {
-      assert(tempsInTileImage(child(c)).length === 1,
-        f"$name has ${tempsInTileImage(child(c))} members of $testTemps")
+      assert(tempsInTileImage(c).length === 1,
+        f"$name has ${tempsInTileImage(c)} members of $testTemps")
     }
 
-    testLengthTemps("NW", tiWithTemps.NW)
-    testLengthTemps("NE", tiWithTemps.NE)
-    testLengthTemps("SW", tiWithTemps.SW)
-    testLengthTemps("SE", tiWithTemps.SE)
+    testLengthTemps("NW", ti.NW)
+    testLengthTemps("NE", ti.NE)
+    testLengthTemps("SW", ti.SW)
+    testLengthTemps("SE", ti.SE)
   }
 
 //  test("Test whether pixels in image map to proper Lat Lon") {
