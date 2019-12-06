@@ -20,7 +20,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
   test("Test whether TileImages at zoom level 1 can rebuild zoom level 0") {
     def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
       val t = Tile(x, y, zoom)
-      val img = List.fill(t.tileSize * t.tileSize)(color)
+      val img = Array.fill(t.tileSize * t.tileSize)(color)
       TileImage(t, Some(img))
     }
 
@@ -50,7 +50,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
   test("Test whether TileImages depth level 0 and 1 works") {
     def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
       val t = Tile(x, y, zoom)
-      val img = List.fill(t.tileSize * t.tileSize)(color)
+      val img = Array.fill(t.tileSize * t.tileSize)(color)
       TileImage(t, Some(img))
     }
 
@@ -163,6 +163,25 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(topLocation === nwNw.t.location, "Test accuracy of (0) tile coordinate")
     assert(Location(bottomLocation.lat - nwNw.latIdx, bottomLocation.lon + nwNw.lonIdx)  === nwSe.t.location, f"Test accuracy of (${(tileWidth * tileWidth - 1).toInt}) tile coordinate")
   }
+
+  test("Test getTileImage") {
+    val rootNode = TileImage(Tile(0, 0, 0)).grow(3)
+
+    def testNode(t: Tile) =
+      assert(rootNode.getTileImage(t).getOrElse(TileImage(Tile(0, 0, 0))).t === t,
+        f"Tile $t should be in tree")
+
+    testNode(Tile(1, 1, 2))
+    testNode(Tile(1, 1, 3))
+    testNode(Tile(0, 0, 0))
+
+    assert(rootNode.getTileImage(Tile(1, 1, 4)).isEmpty, "We shouldn't find tile that is non-existent")
+  }
+
+  // TODO: implement
+//  test("Tests whether colors are consistent across zoom levels with TileImage") {
+//
+//  }
 
   //  test("Test whether new TileImage with applicable temperatures works") {
 //    val testX = 0

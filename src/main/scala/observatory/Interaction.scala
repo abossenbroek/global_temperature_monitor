@@ -2,7 +2,10 @@ package observatory
 
 import java.io.File
 
+import com.sksamuel.scrimage.ScaleMethod.FastScale
 import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
+
+import scala.collection.immutable.TreeMap
 
 /**
   * 3rd milestone: interactive visualization
@@ -10,6 +13,7 @@ import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
 object Interaction {
   import Visualization._
   val tileWidth = 128f
+  val alpha = 70
 
   /**
     * @param tile Tile coordinates
@@ -19,15 +23,15 @@ object Interaction {
     tile.location
   }
 
-  def combineTiles(NW: List[Pixel], NE: List[Pixel], SW: List[Pixel], SE: List[Pixel]) : List[Pixel] = {
-    def combineCubes(a: List[Pixel], b: List[Pixel]): List[Pixel] = {
+  def combineTiles(NW: Array[Pixel], NE: Array[Pixel], SW: Array[Pixel], SE: Array[Pixel]) : Array[Pixel] = {
+    def combineCubes(a: Array[Pixel], b: Array[Pixel]): Array[Pixel] = {
       val height = math.sqrt(a.length).toInt
       Range(0, height).map{i => {
         val start = i * height
         val end = (i + 1) * height
         a.slice(start, end) ++ b.slice(start, end)
       }
-      }.foldLeft(List[Pixel]())(_++_)
+      }.foldLeft(List[Pixel]())(_++_).toArray
     }
 
     val top = combineCubes(NW, NE)
@@ -45,7 +49,7 @@ object Interaction {
     temperatures.filter{temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight}
 
   case class TileImage(t: Tile,
-                       image: Option[List[Pixel]],
+                       image: Option[Array[Pixel]],
                        NW: Option[TileImage],
                        NE: Option[TileImage],
                        SW: Option[TileImage],
@@ -87,27 +91,52 @@ object Interaction {
       Location(latMap(lat), lonMap(lon))
     }
 
-//    def visualize(temps: => Iterable[(Location, Temperature)]) : TileImage = {
-//      val tempScale = calculateScale(colorScale)
-//      visualize(temps, tempScale)
-//    }
+    def visualize(temps: => Iterable[(Location, Temperature)]) : TileImage = {
+      val tempScale = calculateScale(colorScale)
+      visualize(temps, tempScale)
+    }
 
-//    def visualize(temps: => Iterable[(Location, Temperature)], tempScale: => TreeMap[Temperature, Color]): TileImage = (NW, NE, SW, SE) match {
-//      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
-//        val newNW = nw.visualize(temps, tempScale)
-//        val newNE = ne.visualize(temps, tempScale)
-//        val newSW = sw.visualize(temps, tempScale)
-//        val newSE = se.visualize(temps, tempScale)
-//
-//        def getImage(c: TileImage): List[Pixel] = c.image.getOrElse(List[Pixel])
-//
-//        val newImage = combineTiles(getImage(newNW), getImage(newNE), getImage(newSW), getImage(newSE))
-//        new TileImage(t, Some(newImage), Some(newNW), Some(newNE), Some(newSW), Some(newSE))
-//      case _ =>
-//
-//
-//
-//    }
+    def visualize(temps: => Iterable[(Location, Temperature)], tempScale: => TreeMap[Temperature, Color]): TileImage = (NW, NE, SW, SE) match {
+      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+        val newNW = nw.visualize(temps, tempScale)
+        val newNE = ne.visualize(temps, tempScale)
+        val newSW = sw.visualize(temps, tempScale)
+        val newSE = se.visualize(temps, tempScale)
+
+        def getImage(c: TileImage): Array[Pixel] = c.image.getOrElse(Array[Pixel]())
+
+        val newImage = combineTiles(getImage(newNW), getImage(newNE), getImage(newSW), getImage(newSE)).toArray
+        new TileImage(t, Some(newImage), Some(newNW), Some(newNE), Some(newSW), Some(newSE))
+      case _ =>
+        val tileCoords = 0 until (tileWidth * tileWidth).toInt
+        val tileColors = tileCoords.map { i => {
+          val currentLocation = tileCoordinate(i)
+          val currentTemp = predictTemperature(temps, currentLocation)
+          val col = interpolateColorWithScale(tempScale, currentTemp)
+          Pixel(PixelTools.argb(alpha, col.red, col.green, col.blue))
+        }
+        }
+        val imgArray = tileColors.toArray
+        val img = Image(tileWidth.toInt, tileWidth.toInt, imgArray)
+        val scaledImg = img.scaleTo(256, 256, FastScale)
+        // TODO: consider saving image for easy saving
+        this.copy(image = Some(scaledImg.pixels))
+    }
+
+    def getTileImage(target: Tile): Option[TileImage] = {
+      if (target == t) return Some(this)
+      (NW, NE, SW, SE) match {
+        case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+          val tiles = List(nw, ne, sw, se)
+          tiles.map{ti =>
+            val res = ti.getTileImage(target)
+            if (res.nonEmpty) return res
+          }
+          None
+        case (_, _, _, _) =>
+          None
+      }
+    }
 
     def grow(levels: Int): TileImage = (levels, NW, NE, SW, SE) match {
       case (0, _, _, _, _) =>  this
@@ -127,7 +156,6 @@ object Interaction {
         tileImageWithChildren(t, NW, NE, SW, SE)
       case _ => throw new InvalidTree
     }
-
   }
 
   object TileImage {
@@ -145,37 +173,13 @@ object Interaction {
       new TileImage(t, image, Some(NW), Some(NE), Some(SW), Some(SE))
     }
 
-    def apply(t: Tile, image: Option[List[Pixel]]): TileImage = {
+    def apply(t: Tile, image: Option[Array[Pixel]]): TileImage = {
       new TileImage(t, image, None, None, None, None)
     }
 
     def apply(t: Tile): TileImage = {
       new TileImage(t, None, None, None, None, None)
     }
-
-
-//    def grow(depths: Int, t: Tile): TileImage = depths match {
-//      case 0 => {
-//        val bottomRight = Tile(t.x + 1, t.y + 1, t.zoom)
-//        val centerLat = (t.location.lat - bottomRight.lat) / 2d + t.location.lat
-//        val centerLon = (t.location.lon - bottomRight.lon) / 2d + t.location.lon
-//        val center = Location(centerLat, centerLon)
-//
-//        val nw = TileImage(Tile(t.x * 2, t.y * 2, t.zoom + 1), None, t.topLeft, center)
-//        val ne = TileImage(Tile(t.x * 2 + 1, t.y * 2, t.zoom + 1), None,
-//          Location(t.topLeft.lat, centerLon),
-//          Location(centerLat, t.bottomRight.lon))
-//        val sw = TileImage(Tile(t.x * 2, t.y * 2 + 1, t.zoom + 1), None,
-//          Location(centerLat, t.topLeft.lon),
-//          Location(t.bottomRight.lat, centerLon))
-//        val se = TileImage(Tile(t.x * 2 + 1, t.y * 2 + 1, t.zoom + 1), None,
-//          center,
-//          t.bottomRight)
-//
-//        new TileImage(t.t, Some(nw), Some(ne), Some(sw), Some(se), t.topLeft, t.bottomRight)
-//      }
-//
-//    }
   }
 
   def centerOfTile(t: Tile): Location = {
@@ -194,96 +198,95 @@ object Interaction {
     * @param tile         Tile coordinates
     * @return A 256×256 image showing the contents of the given tile
     */
-  def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
-     // Tile can be split up in recursion, results can be merged back together
-
-
-    val alpha = 70
-
-    // TODO:
-    // 1. Determine left and right most x
-    // 2. Determine top and bottom most y
-
-
-    // TODO: add check to map indices back to proper lat lon with slippy map tilenames
-    // Check possible use of https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Subtiles
-//    def indices(i: Int): (Int, Int) = {
-//      val rowNum = math.floor(i / width)
-//      val colNum = i - width * rowNum
-//      (rowNum.toInt, colNum.toInt)
-//    }
+//  def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
+//     // Tile can be split up in recursion, results can be merged back together
 //
-//    // TODO: these are pure x, y pixels values and not mercator mapping
-//    val latMap = (0 until width.toInt).map { i =>
-//      tile.location.lat + latIdx * i
-//    }
 //
-//    val lonMap = (0 until width.toInt).map { i =>
-//      tile.location.lon + lonIdx * i
-//    }
 //
-    //    val tempScale = Visualization.calculateScale(colors)
-
-    val palette = List[(Int, Int, Int)](
-      (0,0,0),
-      (87, 87, 87),
-      (173,35,35),
-      (42, 75, 215),
-      (29, 105, 20),
-      (129,74,25),
-      (129,38,192),
-      (160,160,160),
-      (129,197,122),
-      (157,175,255),
-      (41,208,208),
-      (255,146,51),
-      (255,238,51),
-      (233,222,187),
-      (255,205,243),
-      (255,255,255)
-    )
-
-    // TODO: write recursive function that builds tile from smaller tiles
-    // TODO: write smallest tile function that either builds a single pixel in image or maps (x,y) to mercator lat, lon, to plot
-    // TODO: write small caching to ensure tiles are not all recomputed
-    // @tailrec
-    def generateTile(tile: Tile, maxZoomLevel: Int = 4): List[Pixel] = {
-      if (tile.zoom >= maxZoomLevel) {
-        val maxX = tile.zoom << 1
-        val index = (tile.x + (tile.y * maxX)) % palette.length
-        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} have index $index")
-        List.fill(tile.tileSize * tile.tileSize)(PixelTools.rgb(palette(index)._1, palette(index)._2, palette(index)._3))
-      } else {
-        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} dividing into")
-        val northWest = generateTile(tile.NW, maxZoomLevel)
-        val northEast = generateTile(tile.NE, maxZoomLevel)
-        val southWest = generateTile(tile.SW, maxZoomLevel)
-        val southEast = generateTile(tile.SE, maxZoomLevel)
-
-        combineTiles(northWest, northEast, southWest, southEast)
-      }
-    }
-
-
-//    val worldCoords = 0 until (width.toInt * width.toInt)
-//    val worldColors = worldCoords.par.map { i => {
-//      //    val worldColors = worldCoords.map { i => {
-////      val (rowIndex, colIndex) = indices(i)
-////      val lat = latMap(rowIndex)
-////      val lon = lonMap(colIndex)
-////      val col = Visualization.interpolateColorWithScale(tempScale,
-////        Visualization.predictTemperature(temperatures, Location(lat, lon)))
-////      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
-//      Pixel(PixelTools.rgb(0, 0, 0))
-//    }
-//    }
-    val imgArray = generateTile(tile, maxZoomLevel = 3) .toArray
-    val width = math.sqrt(imgArray.length)
-
-    val img = Image(width.toInt, width.toInt, imgArray)
-//    img.scaleTo(256, 256, FastScale)
-    img
-  }
+//    // TODO:
+//    // 1. Determine left and right most x
+//    // 2. Determine top and bottom most y
+//
+//
+//    // TODO: add check to map indices back to proper lat lon with slippy map tilenames
+//    // Check possible use of https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Subtiles
+////    def indices(i: Int): (Int, Int) = {
+////      val rowNum = math.floor(i / width)
+////      val colNum = i - width * rowNum
+////      (rowNum.toInt, colNum.toInt)
+////    }
+////
+////    // TODO: these are pure x, y pixels values and not mercator mapping
+////    val latMap = (0 until width.toInt).map { i =>
+////      tile.location.lat + latIdx * i
+////    }
+////
+////    val lonMap = (0 until width.toInt).map { i =>
+////      tile.location.lon + lonIdx * i
+////    }
+////
+//    //    val tempScale = Visualization.calculateScale(colors)
+//
+//    val palette = List[(Int, Int, Int)](
+//      (0,0,0),
+//      (87, 87, 87),
+//      (173,35,35),
+//      (42, 75, 215),
+//      (29, 105, 20),
+//      (129,74,25),
+//      (129,38,192),
+//      (160,160,160),
+//      (129,197,122),
+//      (157,175,255),
+//      (41,208,208),
+//      (255,146,51),
+//      (255,238,51),
+//      (233,222,187),
+//      (255,205,243),
+//      (255,255,255)
+//    )
+//
+//    // TODO: write recursive function that builds tile from smaller tiles
+//    // TODO: write smallest tile function that either builds a single pixel in image or maps (x,y) to mercator lat, lon, to plot
+//    // TODO: write small caching to ensure tiles are not all recomputed
+//    // @tailrec
+////    def generateTile(tile: Tile, maxZoomLevel: Int = 4): List[Pixel] = {
+////      if (tile.zoom >= maxZoomLevel) {
+////        val maxX = tile.zoom << 1
+////        val index = (tile.x + (tile.y * maxX)) % palette.length
+////        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} have index $index")
+////        List.fill(tile.tileSize * tile.tileSize)(PixelTools.rgb(palette(index)._1, palette(index)._2, palette(index)._3))
+////      } else {
+////        println(s"for tile (${tile.x}, ${tile.y}) at zoom ${tile.zoom} dividing into")
+////        val northWest = generateTile(tile.NW, maxZoomLevel)
+////        val northEast = generateTile(tile.NE, maxZoomLevel)
+////        val southWest = generateTile(tile.SW, maxZoomLevel)
+////        val southEast = generateTile(tile.SE, maxZoomLevel)
+////
+////        combineTiles(northWest, northEast, southWest, southEast)
+////      }
+////    }
+//
+//
+////    val worldCoords = 0 until (width.toInt * width.toInt)
+////    val worldColors = worldCoords.par.map { i => {
+////      //    val worldColors = worldCoords.map { i => {
+//////      val (rowIndex, colIndex) = indices(i)
+//////      val lat = latMap(rowIndex)
+//////      val lon = lonMap(colIndex)
+//////      val col = Visualization.interpolateColorWithScale(tempScale,
+//////        Visualization.predictTemperature(temperatures, Location(lat, lon)))
+//////      Pixel(PixelTools.rgb(col.red, col.green, col.blue))
+////      Pixel(PixelTools.rgb(0, 0, 0))
+////    }
+////    }
+////    val imgArray = generateTile(tile, maxZoomLevel = 3) .toArray
+////    val width = math.sqrt(imgArray.length)
+////
+////    val img = Image(width.toInt, width.toInt, imgArray)
+//////    img.scaleTo(256, 256, FastScale)
+////    img
+//  }
 
   /**
     * Generates all the tiles for zoom levels 0 to 3 (included), for all the given years.
@@ -298,55 +301,17 @@ object Interaction {
                            generateImage: (Year, Tile, Data) => Unit
                          ): Unit = {
 
-    def genMap(zoom: Int, year: Year, data: Data): Unit = {
-//      val xTiles = math.pow(2, zoom).toInt
-//      val totalTiles = xTiles * xTiles
-//
-//      def indices(i: Int): (Int, Int) = {
-//        val rowNum = math.floor(i / xTiles.toFloat).toInt
-//        val colNum = i - xTiles * rowNum
-//        (rowNum, colNum)
-//      }
-
-//      (0 until totalTiles).foreach { i =>
-//        val (rowIdx, colIdx) = indices(i)
-        generateImage(year, Tile(0, 0, 0), data)
-//      }
-    }
-//
-//
-    yearlyData.map { i =>
-//      (0 to 2).map { z =>
-          genMap(1, i._1, i._2)
-//      }
-    }
-
-//    val maps = yearlyData.flatMap { i =>
-//      (0 to 3).map { z =>
-//        Future {
-//          genMap(z, i._1, i._2)
-//        }
-//      }
-//    }
-//
-//    maps.foreach(f => Await.result(f, 5000 second))
-
-    //    for {
-    //      (y, d) <- yearlyData
-    //      z <- 1 to 3
-    //      //f <- Future(genMap(z, y, d))
-    //    }(genMap(z, y, d))
 
   }
 
   def tileSave(year: Year, tileToSave: Tile, temperatures: Iterable[(Location, Temperature)]): Unit = {
 
     //TODO: change tile
-    val img = tile(temperatures, colorScale, tileToSave)
-    val dirName = s"target/temperatures/$year/${tileToSave.zoom}"
-    val pathName = s"$dirName/${tileToSave.x}-${tileToSave.y}.png"
-    val success = (new File(dirName)).mkdirs
-
-    img.output(new java.io.File(pathName))
+//    val img = tile(temperatures, colorScale, tileToSave)
+//    val dirName = s"target/temperatures/$year/${tileToSave.zoom}"
+//    val pathName = s"$dirName/${tileToSave.x}-${tileToSave.y}.png"
+//    val success = (new File(dirName)).mkdirs
+//
+//    img.output(new java.io.File(pathName))
   }
 }
