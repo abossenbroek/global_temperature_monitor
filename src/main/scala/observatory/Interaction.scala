@@ -8,6 +8,8 @@ import com.sksamuel.scrimage.{Image, Pixel, PixelTools}
   * 3rd milestone: interactive visualization
   */
 object Interaction {
+  import Visualization._
+  val tileWidth = 128f
 
   /**
     * @param tile Tile coordinates
@@ -53,11 +55,59 @@ object Interaction {
     lazy val y: Int = t.y
     lazy val location: Location = t.location
     lazy val bottomRight: Location = Tile(x + 1, y + 1, zoom).location
+    lazy val hasChildren: Boolean = NW.nonEmpty && NE.nonEmpty && SW.nonEmpty && SE.nonEmpty
+    lazy val isRoot: Boolean = (zoom == 0) && hasChildren
+    lazy val tileLatRange = location.lat - bottomRight.lat
+    lazy val tileLonRange = -(location.lon - bottomRight.lon)
+    lazy val latIdx = tileLatRange / tileWidth
+    lazy val lonIdx = tileLonRange / tileWidth
+
 
     def depth(): Int = (NW, NE, SW, SE) match {
       case (Some(nw), Some(ne), Some(sw), Some(se)) => 1 + List[Int](nw.depth, ne.depth, sw.depth, se.depth).min
       case _ => 0
     }
+
+    private def indices(i: Int): (Int, Int) = {
+      val rowNum = math.floor(i / tileWidth)
+      val colNum = i - tileWidth * rowNum
+      (rowNum.toInt, colNum.toInt)
+    }
+
+    private lazy val latMap = (0 until tileWidth.toInt).map { i =>
+      t.location.lat - latIdx * i
+    }
+
+    private lazy val lonMap = (0 until tileWidth.toInt).map { i =>
+      t.location.lon + lonIdx * i
+    }
+
+    def tileCoordinate(i: Int) : Location = {
+      val (lat, lon) = indices(i)
+      Location(latMap(lat), lonMap(lon))
+    }
+
+//    def visualize(temps: => Iterable[(Location, Temperature)]) : TileImage = {
+//      val tempScale = calculateScale(colorScale)
+//      visualize(temps, tempScale)
+//    }
+
+//    def visualize(temps: => Iterable[(Location, Temperature)], tempScale: => TreeMap[Temperature, Color]): TileImage = (NW, NE, SW, SE) match {
+//      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+//        val newNW = nw.visualize(temps, tempScale)
+//        val newNE = ne.visualize(temps, tempScale)
+//        val newSW = sw.visualize(temps, tempScale)
+//        val newSE = se.visualize(temps, tempScale)
+//
+//        def getImage(c: TileImage): List[Pixel] = c.image.getOrElse(List[Pixel])
+//
+//        val newImage = combineTiles(getImage(newNW), getImage(newNE), getImage(newSW), getImage(newSE))
+//        new TileImage(t, Some(newImage), Some(newNW), Some(newNE), Some(newSW), Some(newSE))
+//      case _ =>
+//
+//
+//
+//    }
 
     def grow(levels: Int): TileImage = (levels, NW, NE, SW, SE) match {
       case (0, _, _, _, _) =>  this
@@ -98,7 +148,6 @@ object Interaction {
     def apply(t: Tile, image: Option[List[Pixel]]): TileImage = {
       new TileImage(t, image, None, None, None, None)
     }
-
 
     def apply(t: Tile): TileImage = {
       new TileImage(t, None, None, None, None, None)
@@ -148,11 +197,8 @@ object Interaction {
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
      // Tile can be split up in recursion, results can be merged back together
 
-//    val width = 256f
-//    val width = 128f
+
     val alpha = 70
-//    val latIdx = tile.latSpan / width
-//    val lonIdx = tile.lonSpan / width
 
     // TODO:
     // 1. Determine left and right most x
@@ -294,14 +340,6 @@ object Interaction {
   }
 
   def tileSave(year: Year, tileToSave: Tile, temperatures: Iterable[(Location, Temperature)]): Unit = {
-    val colorScale = List((-60d, Color(0, 0, 0)),
-      (-50d, Color(33, 0, 107)),
-      (-27d, Color(255, 0, 255)),
-      (-15d, Color(0, 0, 255)),
-      (0d, Color(0, 255, 255)),
-      (12d, Color(255, 255, 0)),
-      (32d, Color(255, 0, 0)),
-      (60d, Color(255, 255, 255)))
 
     //TODO: change tile
     val img = tile(temperatures, colorScale, tileToSave)

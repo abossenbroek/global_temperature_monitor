@@ -1,8 +1,8 @@
 package observatory
 
 import com.sksamuel.scrimage.{Pixel, PixelTools}
-import org.scalatest.{FunSuite, _}
 import org.scalatest.prop.Checkers
+import org.scalatest.{FunSuite, _}
 
 trait InteractionTest extends FunSuite with Checkers with Matchers {
   import Interaction._
@@ -139,7 +139,32 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
   }
 
-//  test("Test whether new TileImage with applicable temperatures works") {
+  test("Test whether lat and lon range are correct") {
+    val rootNode = TileImage(Tile(0, 0, 0)).grow(2)
+    assert((child(child(rootNode.NW).NW).tileLonRange
+      + child(child(rootNode.NW).NE).tileLonRange
+      + child(child(rootNode.NE).NW).tileLonRange
+      + child(child(rootNode.NE).NE).tileLonRange) === rootNode.tileLonRange,
+      "Sum of lonRange of four children should equal tile 0 lonRange")
+
+    assert((child(child(rootNode.NW).NW).tileLatRange
+      + child(child(rootNode.NW).SW).tileLatRange
+      + child(child(rootNode.SW).NW).tileLatRange
+      + child(child(rootNode.SW).SW).tileLatRange) === rootNode.tileLatRange,
+      "Sum of latRange of four children should equal tile 0 latRange")
+  }
+
+  test("Test that lat/lon coordinates are well mapped") {
+    val rootNode = TileImage(Tile(0, 0, 0)).grow(2)
+    val nwNw = child(child(rootNode.NW).NW)
+    val nwSe = child(child(rootNode.NW).SE)
+    val topLocation = nwNw.tileCoordinate(0)
+    val bottomLocation = nwNw.tileCoordinate((tileWidth * tileWidth - 1).toInt)
+    assert(topLocation === nwNw.t.location, "Test accuracy of (0) tile coordinate")
+    assert(Location(bottomLocation.lat - nwNw.latIdx, bottomLocation.lon + nwNw.lonIdx)  === nwSe.t.location, f"Test accuracy of (${(tileWidth * tileWidth - 1).toInt}) tile coordinate")
+  }
+
+  //  test("Test whether new TileImage with applicable temperatures works") {
 //    val testX = 0
 //    val testY = 0
 //    val testZoom = 1

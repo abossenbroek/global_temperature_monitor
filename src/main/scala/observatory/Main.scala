@@ -38,15 +38,6 @@ object Main extends App with LazyLogging {
 
   println(temps.take(10))
 
-  val colorScale = List((-60d, Color(0, 0, 0)),
-    (-50d, Color(33, 0, 107)),
-    (-27d, Color(255, 0, 255)),
-    (-15d, Color(0, 0, 255)),
-    (0d, Color(0, 255, 255)),
-    (12d, Color(255, 255, 0)),
-    (32d, Color(255, 0, 0)),
-    (60d, Color(255, 255, 255)))
-
 ////  logger.info(s"Visualization using ${temps.toSeq.length}")
 ////  val time = config(
 ////    Key.exec.benchRuns -> 20,
