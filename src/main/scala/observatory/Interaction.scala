@@ -11,10 +11,11 @@ import scala.collection.immutable.TreeMap
   * 3rd milestone: interactive visualization
   */
 object Interaction {
+
   import Visualization._
+
   val tileWidth = 128f
   val alpha = 70
-  val cache = collection.mutable.Map.empty[Year, TileImage]
   val rootTileImage = TileImage(Tile(0, 0, 0))
   private val onePixelImage = Image(1, 1, Array[Pixel](PixelTools.rgb(0, 0, 0)))
   private val targetSquareDim = 256
@@ -27,15 +28,15 @@ object Interaction {
     tile.location
   }
 
-  def combineTiles(NW: Array[Pixel], NE: Array[Pixel], SW: Array[Pixel], SE: Array[Pixel]) : Array[Pixel] = {
+  def combineTiles(NW: Array[Pixel], NE: Array[Pixel], SW: Array[Pixel], SE: Array[Pixel]): Array[Pixel] = {
     def combineCubes(a: Array[Pixel], b: Array[Pixel]): Array[Pixel] = {
       val height = math.sqrt(a.length).toInt
-      Range(0, height).map{i => {
+      Range(0, height).map { i => {
         val start = i * height
         val end = (i + 1) * height
         a.slice(start, end) ++ b.slice(start, end)
       }
-      }.par.foldLeft(List[Pixel]())(_++_).toArray
+      }.par.foldLeft(List[Pixel]())(_ ++ _).toArray
     }
 
     val top = combineCubes(NW, NE)
@@ -44,14 +45,17 @@ object Interaction {
   }
 
   case class InvalidTiles() extends Exception()
+
   case class InvalidTree() extends Exception()
+
   case class ImageNotPresent() extends Exception()
 
   def tileImageWithChildren(t: Tile, NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage =
     new TileImage(t, None, None, Some(NW), Some(NE), Some(SW), Some(SE))
 
-  def tempsApplicableToTile(ti: TileImage, temperatures: Iterable[(Location, Temperature)]): Iterable[(Location, Temperature)] =
-    temperatures.filter{temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight}
+  def tempsApplicableToTile(ti: TileImage, temperatures: Iterable[(Location, Temperature)]):
+  Iterable[(Location, Temperature)] =
+    temperatures.filter { temp => (ti.location >~= temp._1) && temp._1 > ti.bottomRight }
 
   case class TileImage(t: Tile,
                        pixelArray: Option[Array[Pixel]],
@@ -93,21 +97,22 @@ object Interaction {
       t.location.lon + lonIdx * i
     }
 
-    def tileCoordinate(i: Int) : Location = {
+    def tileCoordinate(i: Int): Location = {
       val (lat, lon) = indices(i)
       Location(latMap(lat), lonMap(lon))
     }
 
-    def visualize(temps: => Iterable[(Location, Temperature)]) : TileImage = {
+    def visualize(temps: => Iterable[(Location, Temperature)]): TileImage = {
       visualize(temps, colorScale)
     }
 
-    def visualize(temps: => Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]) : TileImage = {
+    def visualize(temps: => Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): TileImage = {
       val tempScale = calculateScale(colors)
       visualizeWorker(temps, tempScale)
     }
 
-    def visualizeWorker(temps: => Iterable[(Location, Temperature)], tempScale: => TreeMap[Temperature, Color]): TileImage = (NW, NE, SW, SE) match {
+    def visualizeWorker(temps: => Iterable[(Location, Temperature)], tempScale: => TreeMap[Temperature, Color]):
+    TileImage = (NW, NE, SW, SE) match {
       case (Some(nw), Some(ne), Some(sw), Some(se)) =>
         val newNW = nw.visualizeWorker(temps, tempScale)
         val newNE = ne.visualizeWorker(temps, tempScale)
@@ -133,18 +138,18 @@ object Interaction {
         val imgArray = tileColors.toArray
         val img = Image(tileWidth.toInt, tileWidth.toInt, imgArray)
         val scaledImg = img.scaleTo(targetSquareDim, targetSquareDim, FastScale)
-        this.copy(pixelArray = Some(scaledImg.pixels), image=Some(scaledImg))
+        this.copy(pixelArray = Some(scaledImg.pixels), image = Some(scaledImg))
     }
 
-    def getTiles : List[Tile] = (NW, NE, SW, SE) match {
-         case (Some(nw), Some(ne), Some(sw), Some(se)) =>
-           t :: List(nw, ne, sw, se).foldLeft(List[Tile]())(_++_.getTiles)
-         case (_, _, _, _) =>
-           List[Tile](t)
-       }
+    def getTiles: List[Tile] = (NW, NE, SW, SE) match {
+      case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+        t :: List(nw, ne, sw, se).foldLeft(List[Tile]())(_ ++ _.getTiles)
+      case (_, _, _, _) =>
+        List[Tile](t)
+    }
 
 
-    def save(year: Int) : Unit = {
+    def save(year: Int): Unit = {
       if (image.isEmpty) throw ImageNotPresent()
 
       def saveImage(): Unit = {
@@ -156,21 +161,23 @@ object Interaction {
 
       (NW, NE, SW, SE) match {
         case (Some(nw), Some(ne), Some(sw), Some(se)) =>
-          List(nw, ne, sw, se).foreach{_.save(year)}
-          saveImage
+          List(nw, ne, sw, se).foreach {
+            _.save(year)
+          }
         case (_, _, _, _) =>
-          saveImage
       }
+
+      saveImage
     }
 
     def getTileImage(target: Tile): Option[TileImage] = {
-      if (target == t) return Some(this)
-      (NW, NE, SW, SE) match {
+      if (target == t) Some(this)
+      else (NW, NE, SW, SE) match {
         case (Some(nw), Some(ne), Some(sw), Some(se)) =>
           val tiles = List(nw, ne, sw, se)
-          tiles.foreach{ti =>
+          tiles.foreach { ti =>
             val res = ti.getTileImage(target)
-            if (res.nonEmpty) return res
+            if (res.nonEmpty) res
           }
           None
         case (_, _, _, _) =>
@@ -179,7 +186,7 @@ object Interaction {
     }
 
     def grow(levels: Int): TileImage = (levels, NW, NE, SW, SE) match {
-      case (0, _, _, _, _) =>  this
+      case (0, _, _, _, _) => this
       case (i, None, None, None, None) =>
         val newLevels = i - 1
         val NW = TileImage(Tile(t.x * 2, t.y * 2, t.zoom + 1)).grow(newLevels)
@@ -188,7 +195,7 @@ object Interaction {
         val SE = TileImage(Tile(t.x * 2 + 1, t.y * 2 + 1, t.zoom + 1)).grow(newLevels)
         tileImageWithChildren(t, NW, NE, SW, SE)
       case (i, Some(nw), Some(ne), Some(sw), Some(se)) =>
-        val newLevels = i -1
+        val newLevels = i - 1
         val NW = nw.grow(newLevels)
         val NE = ne.grow(newLevels)
         val SW = sw.grow(newLevels)
@@ -199,24 +206,6 @@ object Interaction {
   }
 
   object TileImage {
-//    def apply(NW: TileImage, NE: TileImage, SW: TileImage, SE: TileImage): TileImage = {
-//      if (!(((NW.x + 1) == NE.x) && ((NW.y + 1) == SW.y) && (NW.y == NE.y) && (SW.y == SE.y) && (SW.x + 1) == SE.x)) {
-//        throw InvalidTiles()
-//      }
-//      val t = Tile(NW.x / 2, NW.y / 2, NW.zoom - 1)
-//      val pixelArray = (NW.pixelArray, NE.pixelArray, SW.pixelArray, SE.pixelArray) match {
-//        case (Some(nw), Some(ne), Some(sw), Some(se)) =>
-//          Some(combineTiles(nw, ne, sw, se))
-//        case _ =>
-//          None
-//      }
-//      new TileImage(t, pixelArray, Some(NW), Some(NE), Some(SW), Some(SE))
-//    }
-
-//    def apply(t: Tile, pixelArray: Option[Array[Pixel]]): TileImage = {
-//      new TileImage(t, pixelArray, None, None, None, None)
-//    }
-
     def apply(t: Tile): TileImage = {
       new TileImage(t, None, None, None, None, None, None)
     }
@@ -229,8 +218,7 @@ object Interaction {
     val centerLon = GlobalCoordinates.TopLeft.lon + (t.x + 0.5) * lonSlope
     Location(centerLat, centerLon)
   }
-  
-  
+
 
   /**
     * @param temperatures Known temperatures
@@ -238,7 +226,8 @@ object Interaction {
     * @param tile         Tile coordinates
     * @return A 256×256 pixelArray showing the contents of the given tile
     */
-  def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
+  def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile):
+  Image = {
     val rootNode = rootTileImage.grow(levels = tile.zoom)
     val visTree = rootNode.visualize(temperatures, colors)
     println(f"### tile: called with temperatures $temperatures")
@@ -248,7 +237,7 @@ object Interaction {
   }
 
   // TODO: add max zoom level to map
-  val tileImageByYear : collection.concurrent.Map[Year, TileImage] = collection.concurrent.TrieMap.empty[Year, TileImage]
+  val tileImageByYear: collection.concurrent.Map[Year, Int] = collection.concurrent.TrieMap.empty[Year, Int]
 
   /**
     * Generates all the tiles for zoom levels 0 to 3 (included), for all the given years.
@@ -272,24 +261,19 @@ object Interaction {
         }
       }
     }
-
-    // TODO: then call generateImage and let generateImage update the cache
-
   }
 
   def tileSave(year: Year, tileToSave: Tile, temperatures: Iterable[(Location, Temperature)]): Unit = {
-    def generateTile: TileImage = {
-      val zoomLevel = math.max(3, tileToSave.zoom)
+    val defaultLevel = 3
+    def generateTile: Unit = {
+      val zoomLevel = math.max(defaultLevel, tileToSave.zoom)
       val newEntry = rootTileImage.grow(zoomLevel).visualize(temperatures)
       newEntry.save(year)
-      newEntry
     }
-    if (!tileImageByYear.getOrElse(year, rootTileImage).hasImage) {
-      tileImageByYear.update(year, generateTile)
-    } else if (tileImageByYear(year).depth < tileToSave.zoom) {
-      tileImageByYear.update(year, generateTile)
-    } else if (!tileImageByYear(year).hasImage) {
-      tileImageByYear.update(year, generateTile)
+
+    if (tileImageByYear.getOrElse(year, -1) < tileToSave.zoom) {
+      generateTile
+      tileImageByYear.update(year, defaultLevel)
     }
   }
 }
