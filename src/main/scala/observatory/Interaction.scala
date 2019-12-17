@@ -262,7 +262,7 @@ object Interaction {
                            yearlyData: Iterable[(Year, Data)],
                            generateImage: (Year, Tile, Data) => Unit
                          ): Unit = {
-    println(s"### generateTiles: {$yearlyData.toList}")
+    println(s"### generateTiles: ${yearlyData.toList.take(20)}")
     yearlyData.groupBy(yd => yd._1).foreach { yD =>
       yD._2.foreach { yd =>
         print(s"-- working on ${yd._1} ${yd._2}")
