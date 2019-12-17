@@ -9,8 +9,9 @@ import org.apache.log4j.{Level, Logger}
 //object Main extends App with LazyLogging {
 object Main extends App {
   import Interaction._
-
-  val generateTemp = false
+//object Main extends App {
+  val cacheFileName = "temp.tmp"
+  val generateTemp = new java.io.File(cacheFileName).exists
   Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
   val forkJoinPool = new java.util.concurrent.ForkJoinPool(6)
 
@@ -26,13 +27,13 @@ object Main extends App {
 //    logger.info("Extracting temperatures")
     val temps = Extraction.locationYearlyAverageRecords(temp1989)
 
-    val fos = new FileOutputStream("temp.tmp")
+    val fos = new FileOutputStream(cacheFileName)
     val oos = new ObjectOutputStream(fos)
     oos.writeObject(temps.take(2000))
     oos.close()
   }
 
-  val fis = new FileInputStream("temp.tmp")
+  val fis = new FileInputStream(cacheFileName)
   val ois = new ObjectInputStream(fis)
   val temps = ois.readObject().asInstanceOf[Iterable[(Location, Temperature)]]
 
