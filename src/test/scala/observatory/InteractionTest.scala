@@ -165,9 +165,18 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
   }
 
   test("Test getTiles returns right number of entries") {
+    def sortTiles(l: List[Tile]) = l.sortBy(m => m.x + 10 * m.y + 100 * m.zoom)
     val rootNode = rootTileImage.grow(levels=1)
     assert(rootNode.getTiles === List(Tile(0,0,0), Tile(0, 0, 1), Tile(1, 0, 1), Tile(0, 1, 1), Tile(1, 1, 1)),
       "Test whether number of elements at level 1 is correct")
+    assert(sortTiles(rootNode.grow(levels=2).getTiles) ===
+      sortTiles(List(Tile(0,0,0), Tile(0, 0, 1), Tile(1, 0, 1), Tile(0, 1, 1), Tile(1, 1, 1),
+        Tile(0,0,2), Tile(1,0,2), Tile(2, 0, 2), Tile(3, 0, 2),
+        Tile(0,1,2), Tile(1,1,2), Tile(2, 1, 2), Tile(3, 1, 2),
+        Tile(0,2,2), Tile(1,2,2), Tile(2, 2, 2), Tile(3, 2, 2),
+        Tile(0,3,2), Tile(1,3,2), Tile(2, 3, 2), Tile(3, 3, 2)
+      )),
+      "Test whether number of elements at level 2 is correct")
   }
 
   test("Test getTileImage") {
@@ -182,6 +191,78 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     testNode(Tile(0, 0, 0))
 
     assert(rootNode.getTileImage(Tile(1, 1, 4)).isEmpty, "We shouldn't find tile that is non-existent")
+  }
+
+  test("Tests image size") {
+    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
+    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
+
+    def testDim(t: Tile): Unit = {
+      val img = tile(temps, colScheme, t)
+
+      assert(img.width === 256, s"For tile $t image width should be 256 and not ${img.width}")
+      assert(img.height === 256, s"For tile $t image height should be 256 and not ${img.width}")
+
+    }
+    testDim(Tile(0, 0, 0))
+    testDim(Tile(0, 0, 1))
+    testDim(Tile(7, 7, 3))
+  }
+
+
+  def latLonPixel(l: Location, z: Int): ((Int, Int), (Int, Int)) = {
+    val coordSize: Int = (math.max(1, 1 << z) * Tile(0, 0, 0).tileSize - 1)
+    val y = ((l.lat - GlobalCoordinates.TopLeft.lat) /
+      -(GlobalCoordinates.TopLeft.lat - GlobalCoordinates.BottomRight.lat) * coordSize).toInt
+    val x = ((l.lon + GlobalCoordinates.BottomRight.lon) /
+      (-GlobalCoordinates.TopLeft.lon + GlobalCoordinates.BottomRight.lon) * coordSize).toInt
+
+
+    val tileX = x / Tile(0, 0, 0).tileSize
+    val tileY = y / Tile(0, 0, 0).tileSize
+    val inTileX = x % Tile(0, 0, 0).tileSize
+    val inTileY = y % Tile(0, 0, 0).tileSize
+
+    ((tileX, tileY), (inTileX, inTileY))
+  }
+
+  test("Test latLonPixel function") {
+    val resZoom0 = latLonPixel(Location(-85.0511, 180), 0)
+    assert(resZoom0._1.equals((0, 0)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._1}")
+    assert(resZoom0._2.equals((255, 255)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._2}")
+  }
+
+  test("Tests consistency of generated images 1") {
+    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
+    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
+
+    val imgTile000 = tile(temps, colScheme, Tile(0, 0, 0))
+    val imgTile001 = tile(temps, colScheme, Tile(0, 0, 1))
+    val imgTile773 = tile(temps, colScheme, Tile(7, 7, 3))
+
+    imgTile000.output(new java.io.File("target/imgTile1_000.png"))
+    imgTile001.output(new java.io.File("target/imgTile1_001.png"))
+    imgTile773.output(new java.io.File("target/imgTile1_773.png"))
+  }
+
+  test("Tests consistency of generated images 2") {
+    val temps = Array((Location(45.0, -90.0), 20.0), (Location(45.0, 90.0), 0.0), (Location(0.0, 0.0), 10.0),
+      (Location(-45.0, -90.0), 0.0), (Location(-45.0, 90.0), 20.0))
+    val colScheme = List((0.0,Color(255,0,0)), (10.0,Color(0,255,0)), (20.0,Color(0,0,255)))
+    val testLocation = Location(-27.059125784374057,-180.0)
+    val coordsZoomLevel0 = latLonPixel(testLocation, 0)
+
+    val imgTileZoomLevel0 = tile(temps, colScheme, Tile(0, 0, 0))
+    val testColor0 = imgTileZoomLevel0.argb(coordsZoomLevel0._2._1, coordsZoomLevel0._2._2)
+    val coordsZoomLevel1 = latLonPixel(testLocation, 1)
+    val imgTileZoomLevel1 = tile(temps, colScheme, Tile(coordsZoomLevel1._1._1, coordsZoomLevel1._1._2, 1))
+    assert(coordsZoomLevel1._2._1 < imgTileZoomLevel1.width, s"${coordsZoomLevel1._2._1} doesn't fit in width")
+    assert(coordsZoomLevel1._2._2 < imgTileZoomLevel1.height,s"${coordsZoomLevel1._2._2} doesn't fit in height" )
+
+    val testColor1 = imgTileZoomLevel1.argb(coordsZoomLevel1._2._1, coordsZoomLevel1._2._2)
+
+    assert(testColor0 === testColor1,
+      s"Colors should be same at level 0 ($coordsZoomLevel0) and 1 ($coordsZoomLevel1)")
   }
 
   //  test("Test whether new TileImage with applicable temperatures works") {
