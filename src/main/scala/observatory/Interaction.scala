@@ -71,9 +71,10 @@ object Interaction {
     lazy val tileLonRange = -(location.lon - bottomRight.lon)
     lazy val latIdx = tileLatRange / tileWidth
     lazy val lonIdx = tileLonRange / tileWidth
+    lazy val hasImage = image.isDefined
 
 
-    def depth(): Int = (NW, NE, SW, SE) match {
+    def depth: Int = (NW, NE, SW, SE) match {
       case (Some(nw), Some(ne), Some(sw), Some(se)) => 1 + List[Int](nw.depth, ne.depth, sw.depth, se.depth).min
       case _ => 0
     }
@@ -134,6 +135,14 @@ object Interaction {
         val scaledImg = img.scaleTo(targetSquareDim, targetSquareDim, FastScale)
         this.copy(pixelArray = Some(scaledImg.pixels), image=Some(scaledImg))
     }
+
+    def getTiles : List[Tile] = (NW, NE, SW, SE) match {
+         case (Some(nw), Some(ne), Some(sw), Some(se)) =>
+           t :: List(nw, ne, sw, se).foldLeft(List[Tile]())(_++_.getTiles)
+         case (_, _, _, _) =>
+           List[Tile](t)
+       }
+
 
     def save(year: Int) : Unit = {
       if (image.isEmpty) throw ImageNotPresent()
@@ -232,10 +241,14 @@ object Interaction {
   def tile(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)], tile: Tile): Image = {
     val rootNode = rootTileImage.grow(levels = tile.zoom)
     val visTree = rootNode.visualize(temperatures, colors)
+    println(f"### tile: called with temperatures $temperatures")
+    println(f"### tile: called with color-scheme $colors")
+    println(f"### tile: searching for tile $tile and finding ${visTree.getTileImage(tile).getOrElse(rootNode).t}")
     visTree.getTileImage(tile).getOrElse(rootTileImage).image.getOrElse(onePixelImage)
   }
 
-//  def cacheYearData:
+  // TODO: add max zoom level to map
+  val tileImageByYear : collection.concurrent.Map[Year, TileImage] = collection.concurrent.TrieMap.empty[Year, TileImage]
 
   /**
     * Generates all the tiles for zoom levels 0 to 3 (included), for all the given years.
@@ -249,14 +262,34 @@ object Interaction {
                            yearlyData: Iterable[(Year, Data)],
                            generateImage: (Year, Tile, Data) => Unit
                          ): Unit = {
-    val zoomLevel = Tile(0, 0, 3)
-    yearlyData.foreach{i => generateImage(i._1, zoomLevel, i._2)}
+    println(s"### generateTiles: {$yearlyData.toList}")
+    yearlyData.groupBy(yd => yd._1).foreach { yD =>
+      yD._2.foreach { yd =>
+        print(s"-- working on ${yd._1} ${yd._2}")
+        val tiles = rootTileImage.grow(3).getTiles
+        tiles.foreach {
+          t => generateImage(yd._1, t, yd._2)
+        }
+      }
+    }
+
+    // TODO: then call generateImage and let generateImage update the cache
+
   }
 
   def tileSave(year: Year, tileToSave: Tile, temperatures: Iterable[(Location, Temperature)]): Unit = {
-    // TODO: add memoization
-    val rootNode = rootTileImage.grow(tileToSave.zoom)
-    val visualizedTree = rootNode.visualize(temperatures)
-    visualizedTree.save(year)
+    def generateTile: TileImage = {
+      val zoomLevel = math.max(3, tileToSave.zoom)
+      val newEntry = rootTileImage.grow(zoomLevel).visualize(temperatures)
+      newEntry.save(year)
+      newEntry
+    }
+    if (!tileImageByYear.getOrElse(year, rootTileImage).hasImage) {
+      tileImageByYear.update(year, generateTile)
+    } else if (tileImageByYear(year).depth < tileToSave.zoom) {
+      tileImageByYear.update(year, generateTile)
+    } else if (!tileImageByYear(year).hasImage) {
+      tileImageByYear.update(year, generateTile)
+    }
   }
 }

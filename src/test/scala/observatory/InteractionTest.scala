@@ -164,6 +164,12 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(Location(bottomLocation.lat - nwNw.latIdx, bottomLocation.lon + nwNw.lonIdx)  === nwSe.t.location, f"Test accuracy of (${(tileWidth * tileWidth - 1).toInt}) tile coordinate")
   }
 
+  test("Test getTiles returns right number of entries") {
+    val rootNode = rootTileImage.grow(levels=1)
+    assert(rootNode.getTiles === List(Tile(0,0,0), Tile(0, 0, 1), Tile(1, 0, 1), Tile(0, 1, 1), Tile(1, 1, 1)),
+      "Test whether number of elements at level 1 is correct")
+  }
+
   test("Test getTileImage") {
     val rootNode = TileImage(Tile(0, 0, 0)).grow(3)
 
