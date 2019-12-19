@@ -18,6 +18,14 @@ object Interaction {
   val alpha = 70
   private val targetSquareDim = 256
 
+  /**
+    * @param tile Tile coordinates
+    * @return The latitude and longitude of the top-left corner of the tile, as per http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+    */
+  def tileLocation(tile: Tile): Location = {
+    tile.location
+  }
+
   def latLonPixel(l: Location, z: Int): (Tile, (Int, Int)) = {
     val coordSize: Int = (math.max(1, 1 << z) * Tile(0, 0, 0).tileSize - 1)
     val y = ((l.lat - GlobalCoordinates.TopLeft.lat) /
