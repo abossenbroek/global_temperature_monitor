@@ -7,250 +7,57 @@ import org.scalatest.{FunSuite, _}
 trait InteractionTest extends FunSuite with Checkers with Matchers {
   import Interaction._
 
-  def child(childNode: Option[TileImage]): TileImage = childNode match {
-    case Some(n) => n
-    case _ => TileImage(Tile(0, 0, 0))
-  }
-
   test("Test boolean operators of Location") {
     assert(Location(85, -180) > Location(-85, 180), "Location(85, -180) > Location(-85, 180) should hold")
     assert(Location(-85, 180) < Location(85, -180), "Location(-85, 180) < Location(85, -180) should hold")
   }
 
-//  test("Test whether TileImages at zoom level 1 can rebuild zoom level 0") {
-//    def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
-//      val t = Tile(x, y, zoom)
-//      val img = Array.fill(t.tileSize * t.tileSize)(color)
-//      TileImage(t, Some(img))
+
+//  test("Tests image size") {
+//    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
+//    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
+//
+//    def testDim(t: Tile): Unit = {
+//      val img = tile(temps, colScheme, t)
+//
+//      assert(img.width === 256, s"For tile $t image width should be 256 and not ${img.width}")
+//      assert(img.height === 256, s"For tile $t image height should be 256 and not ${img.width}")
+//
 //    }
-//
-//    val NW = createTestTileImage(0, 0, 1, PixelTools.rgb(0, 0, 0))
-//    val NE = createTestTileImage(1, 0, 1, PixelTools.rgb(64, 64, 64))
-//    val SW = createTestTileImage(0, 1, 1, PixelTools.rgb(128, 128, 128))
-//    val SE = createTestTileImage(1, 1, 1, PixelTools.rgb(255, 255, 255))
-//
-//    val topLevel = TileImage(NW, NE, SW, SE)
-//    val distinctPixels = topLevel.pixelArray match {
-//      case Some(pl) => pl.distinct.length
-//      case _ => 0}
-//
-//    assert(topLevel.x === 0)
-//    assert(topLevel.y === 0)
-//    assert(topLevel.zoom === 0)
-//    assert(distinctPixels === 4)
+//    testDim(Tile(0, 0, 0))
+//    testDim(Tile(0, 0, 1))
+//    testDim(Tile(7, 7, 3))
 //  }
 
-  test("Whether center of tile is properly calculated") {
-    val t = Tile(0, 0, 0)
-    val center = centerOfTile(t)
 
-    assert(center ~= Location(0, 0))
-  }
-
-//  test("Test whether TileImages depth level 0 and 1 works") {
-//    def createTestTileImage(x: Int, y: Int, zoom: Int, color: Pixel): TileImage = {
-//      val t = Tile(x, y, zoom)
-//      val img = Array.fill(t.tileSize * t.tileSize)(color)
-//      TileImage(t, Some(img))
-//    }
-//
-//    val NW = createTestTileImage(0, 0, 1, PixelTools.rgb(0, 0, 0))
-//    val NE = createTestTileImage(1, 0, 1, PixelTools.rgb(64, 64, 64))
-//    val SW = createTestTileImage(0, 1, 1, PixelTools.rgb(128, 128, 128))
-//    val SE = createTestTileImage(1, 1, 1, PixelTools.rgb(255, 255, 255))
-//
-//    val topLevel = TileImage(NW, NE, SW, SE)
-//
-//    assert(topLevel.depth === 1)
-//    assert(NE.depth === 0)
-//  }
-
-  test("Test whether empty initial node can be grown to depth 1") {
-    val topLevel = TileImage(Tile(0, 0, 0))
-
-    val depthOne = topLevel.grow(1)
-
-    assert(depthOne.depth === 1)
-
-    assert(child(depthOne.NW).t === Tile(0, 0, 1))
-    assert(child(depthOne.NE).t === Tile(1, 0, 1))
-    assert(child(depthOne.SW).t === Tile(0, 1, 1))
-    assert(child(depthOne.SE).t === Tile(1, 1, 1))
-  }
-
-  test("Test whether empty initial node can be grown to depth 1 with bottom corners") {
-    val depthOne = TileImage(Tile(0, 0, 0)).grow(1)
-
-    assert(depthOne.depth === 1)
-
-    def testBottom(name: String, c: Option[TileImage], x: Int, y: Int): Unit = {
-      assert(child(c).bottomRight ~= Tile(x, y, 1).location,
-        f"$name ${child(c).bottomRight} is not ${Tile(x, y,1).location} ")
-    }
-
-    def testBottomLocation(name: String, c: Option[TileImage], lat: Double, lon: Double): Unit = {
-      assert(child(c).bottomRight ~= Location(lat, lon),
-        f"$name ${child(c).bottomRight} is not ${Location(lat, lon)} ")
-    }
-
-    testBottom("NW", depthOne.NW, 1, 1)
-    testBottom("NE", depthOne.NE, 2, 1)
-    testBottom("SW", depthOne.SW, 1, 2)
-    testBottom("SE", depthOne.SE, 2, 2)
-
-    testBottomLocation("NW", depthOne.NW, 0, 0)
-    testBottomLocation("NE", depthOne.NE, 0, 180)
-    testBottomLocation("SW", depthOne.SW, -85.05113, 0)
-    testBottomLocation("SE", depthOne.SE, -85.05113, 180)
-  }
-
-
-  test("Test whether empty initial node can be grown to depth 2") {
-    val topLevel = TileImage(Tile(0, 0, 0))
-
-    val depthTwo = topLevel.grow(2)
-
-    assert(depthTwo.depth === 2)
-
-    def child(childNode: Option[TileImage]): TileImage = childNode match {
-      case Some(n) => n
-      case _ => TileImage(Tile(0, 0, 0))
-    }
-
-    assert(child(depthTwo.NW).depth === 1)
-    assert(child(child(depthTwo.NW).NW).t === Tile(0, 0, 2))
-    assert(child(child(depthTwo.NW).NE).t === Tile(1, 0, 2))
-    assert(child(child(depthTwo.NW).SW).t === Tile(0, 1, 2))
-    assert(child(child(depthTwo.NW).SE).t === Tile(1, 1, 2))
-
-    assert(child(child(depthTwo.NE).NW).t === Tile(2, 0, 2))
-    assert(child(child(depthTwo.NE).NE).t === Tile(3, 0, 2))
-    assert(child(child(depthTwo.NE).SW).t === Tile(2, 1, 2))
-    assert(child(child(depthTwo.NE).SE).t === Tile(3, 1, 2))
-
-    assert(child(child(depthTwo.SW).NW).t === Tile(0, 2, 2))
-    assert(child(child(depthTwo.SW).NE).t === Tile(1, 2, 2))
-    assert(child(child(depthTwo.SW).SW).t === Tile(0, 3, 2))
-    assert(child(child(depthTwo.SW).SE).t === Tile(1, 3, 2))
-
-    assert(child(child(depthTwo.SE).NW).t === Tile(2, 2, 2))
-    assert(child(child(depthTwo.SE).NE).t === Tile(3, 2, 2))
-    assert(child(child(depthTwo.SE).SW).t === Tile(2, 3, 2))
-    assert(child(child(depthTwo.SE).SE).t === Tile(3, 3, 2))
-  }
-
-  test("Test whether lat and lon range are correct") {
-    val rootNode = TileImage(Tile(0, 0, 0)).grow(2)
-    assert((child(child(rootNode.NW).NW).tileLonRange
-      + child(child(rootNode.NW).NE).tileLonRange
-      + child(child(rootNode.NE).NW).tileLonRange
-      + child(child(rootNode.NE).NE).tileLonRange) === rootNode.tileLonRange,
-      "Sum of lonRange of four children should equal tile 0 lonRange")
-
-    assert((child(child(rootNode.NW).NW).tileLatRange
-      + child(child(rootNode.NW).SW).tileLatRange
-      + child(child(rootNode.SW).NW).tileLatRange
-      + child(child(rootNode.SW).SW).tileLatRange) === rootNode.tileLatRange,
-      "Sum of latRange of four children should equal tile 0 latRange")
-  }
-
-  test("Test that lat/lon coordinates are well mapped") {
-    val rootNode = TileImage(Tile(0, 0, 0)).grow(2)
-    val nwNw = child(child(rootNode.NW).NW)
-    val nwSe = child(child(rootNode.NW).SE)
-    val topLocation = nwNw.tileCoordinate(0)
-    val bottomLocation = nwNw.tileCoordinate((tileWidth * tileWidth - 1).toInt)
-    assert(topLocation === nwNw.t.location, "Test accuracy of (0) tile coordinate")
-    assert(Location(bottomLocation.lat - nwNw.latIdx, bottomLocation.lon + nwNw.lonIdx)  === nwSe.t.location, f"Test accuracy of (${(tileWidth * tileWidth - 1).toInt}) tile coordinate")
-  }
-
-  test("Test getTiles returns right number of entries") {
-    def sortTiles(l: List[Tile]) = l.sortBy(m => m.x + 10 * m.y + 100 * m.zoom)
-    val rootNode = rootTileImage.grow(levels=1)
-    assert(rootNode.getTiles === List(Tile(0,0,0), Tile(0, 0, 1), Tile(1, 0, 1), Tile(0, 1, 1), Tile(1, 1, 1)),
-      "Test whether number of elements at level 1 is correct")
-    assert(sortTiles(rootNode.grow(levels=2).getTiles) ===
-      sortTiles(List(Tile(0,0,0), Tile(0, 0, 1), Tile(1, 0, 1), Tile(0, 1, 1), Tile(1, 1, 1),
-        Tile(0,0,2), Tile(1,0,2), Tile(2, 0, 2), Tile(3, 0, 2),
-        Tile(0,1,2), Tile(1,1,2), Tile(2, 1, 2), Tile(3, 1, 2),
-        Tile(0,2,2), Tile(1,2,2), Tile(2, 2, 2), Tile(3, 2, 2),
-        Tile(0,3,2), Tile(1,3,2), Tile(2, 3, 2), Tile(3, 3, 2)
-      )),
-      "Test whether number of elements at level 2 is correct")
-  }
-
-  test("Test getTileImage") {
-    val rootNode = TileImage(Tile(0, 0, 0)).grow(3)
-
-    def testNode(t: Tile) =
-      assert(rootNode.getTileImage(t).getOrElse(TileImage(Tile(0, 0, 0))).t === t,
-        f"Tile $t should be in tree")
-
-    testNode(Tile(1, 1, 2))
-    testNode(Tile(1, 1, 3))
-    testNode(Tile(0, 0, 0))
-
-    assert(rootNode.getTileImage(Tile(1, 1, 4)).isEmpty, "We shouldn't find tile that is non-existent")
-  }
-
-  test("Tests image size") {
-    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
-    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
-
-    def testDim(t: Tile): Unit = {
-      val img = tile(temps, colScheme, t)
-
-      assert(img.width === 256, s"For tile $t image width should be 256 and not ${img.width}")
-      assert(img.height === 256, s"For tile $t image height should be 256 and not ${img.width}")
-
-    }
-    testDim(Tile(0, 0, 0))
-    testDim(Tile(0, 0, 1))
-    testDim(Tile(7, 7, 3))
-  }
-
-
-  def latLonPixel(l: Location, z: Int): ((Int, Int), (Int, Int)) = {
-    val coordSize: Int = (math.max(1, 1 << z) * Tile(0, 0, 0).tileSize - 1)
-    val y = ((l.lat - GlobalCoordinates.TopLeft.lat) /
-      -(GlobalCoordinates.TopLeft.lat - GlobalCoordinates.BottomRight.lat) * coordSize).toInt
-    val x = ((l.lon + GlobalCoordinates.BottomRight.lon) /
-      (-GlobalCoordinates.TopLeft.lon + GlobalCoordinates.BottomRight.lon) * coordSize).toInt
-
-
-    val tileX = x / Tile(0, 0, 0).tileSize
-    val tileY = y / Tile(0, 0, 0).tileSize
-    val inTileX = x % Tile(0, 0, 0).tileSize
-    val inTileY = y % Tile(0, 0, 0).tileSize
-
-    ((tileX, tileY), (inTileX, inTileY))
-  }
 
   test("Test latLonPixel function") {
-    val resZoom0 = latLonPixel(Location(-85.0511, 180), 0)
-    assert(resZoom0._1.equals((0, 0)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._1}")
-    assert(resZoom0._2.equals((255, 255)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._2}")
+    def testLatLonPixel(l: Location, t: Tile, c: (Int, Int)): Unit = {
+      val res = latLonPixel(l, t.zoom)
+      assert(res._1 === t, s"At ${t.zoom}: $l should be in tile $t not ${res._1}")
+      assert(res._2.equals(c), s"At ${t.zoom}: $l should by at coordinate $c not ${res._2}")
+    }
 
-    val resZoom2 = latLonPixel(Location(-85.0511, 180), 2)
-    assert(resZoom2._1.equals((3, 3)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom2._1}")
-    assert(resZoom2._2.equals((255, 255)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom2._2}")
-
-
+    testLatLonPixel(Location(-85.0511, 180), Tile(0, 0, 0), (255, 255))
+    testLatLonPixel(Location(-85.0511, 180), Tile(3, 3, 2), (255, 255))
+    testLatLonPixel(Location(85.0511, -180), Tile(0, 0, 2), (0, 0))
+    testLatLonPixel(Location(0, 0), Tile(1, 1, 2), (255, 255))
+    testLatLonPixel(Location(0, 0), Tile(0, 0, 1), (255, 255))
   }
 
-  test("Tests consistency of generated images 1") {
-    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
-    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
-
-    val imgTile000 = tile(temps, colScheme, Tile(0, 0, 0))
-    val imgTile001 = tile(temps, colScheme, Tile(0, 0, 1))
-    val imgTile773 = tile(temps, colScheme, Tile(7, 7, 3))
-
-    imgTile000.output(new java.io.File("target/imgTile1_000.png"))
-    imgTile001.output(new java.io.File("target/imgTile1_001.png"))
-    imgTile773.output(new java.io.File("target/imgTile1_773.png"))
-  }
-
+//  test("Tests consistency of generated images 1") {
+//    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
+//    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
+//
+//    val imgTile000 = tile(temps, colScheme, Tile(0, 0, 0))
+//    val imgTile001 = tile(temps, colScheme, Tile(0, 0, 1))
+//    val imgTile773 = tile(temps, colScheme, Tile(7, 7, 3))
+//
+//    imgTile000.output(new java.io.File("target/imgTile1_000.png"))
+//    imgTile001.output(new java.io.File("target/imgTile1_001.png"))
+//    imgTile773.output(new java.io.File("target/imgTile1_773.png"))
+//  }
+//
   test("Tests consistency of generated images 2") {
     val temps = Array((Location(45.0, -90.0), 20.0), (Location(45.0, 90.0), 0.0), (Location(0.0, 0.0), 10.0),
       (Location(-45.0, -90.0), 0.0), (Location(-45.0, 90.0), 20.0))
@@ -261,7 +68,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     val imgTileZoomLevel0 = tile(temps, colScheme, Tile(0, 0, 0))
     val testColor0 = imgTileZoomLevel0.argb(coordsZoomLevel0._2._1, coordsZoomLevel0._2._2)
     val coordsZoomLevel1 = latLonPixel(testLocation, 1)
-    val imgTileZoomLevel1 = tile(temps, colScheme, Tile(coordsZoomLevel1._1._1, coordsZoomLevel1._1._2, 1))
+    val imgTileZoomLevel1 = tile(temps, colScheme, coordsZoomLevel1._1)
 
     val testColor1 = imgTileZoomLevel1.argb(coordsZoomLevel1._2._1, coordsZoomLevel1._2._2)
 
@@ -269,11 +76,11 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
       s"Colors should be same at level 0 ($coordsZoomLevel0) and 1 ($coordsZoomLevel1)")
 
     val coordsZoomLevel2 = latLonPixel(testLocation, 2)
-    val imgTileZoomLevel2 = tile(temps, colScheme, Tile(coordsZoomLevel2._1._1, coordsZoomLevel2._1._2, 2))
-    assert(coordsZoomLevel2._1._1 <= imgTileZoomLevel2.width,
-      s"${coordsZoomLevel2._1._1} should fit in ${imgTileZoomLevel2.width}")
-    assert(coordsZoomLevel2._1._2 <= imgTileZoomLevel2.height,
-      s"${coordsZoomLevel2._1._2} should fit in ${imgTileZoomLevel2.height}")
+    val imgTileZoomLevel2 = tile(temps, colScheme, coordsZoomLevel2._1)
+    assert(coordsZoomLevel2._2._1 <= imgTileZoomLevel2.width,
+      s"${coordsZoomLevel2._2._1} should fit in ${imgTileZoomLevel2.width}")
+    assert(coordsZoomLevel2._2._2 <= imgTileZoomLevel2.height,
+      s"${coordsZoomLevel2._2._2} should fit in ${imgTileZoomLevel2.height}")
 
     val testColor2 = imgTileZoomLevel2.argb(coordsZoomLevel2._2._1, coordsZoomLevel2._2._2)
 
@@ -307,58 +114,34 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 //    assert(tempsInTile.length === tempsIn.length)
 //  }
 
-  test("Test whether temperature filter properly works") {
-    val ti = TileImage(Tile(0, 0, 0)).grow(1)
+//  test("Test whether temperature filter properly works") {
+//    val ti = TileImage(Tile(0, 0, 0)).grow(1)
+//
+//    val testTemps = List[(Location, Temperature)](
+//      (Location(80d, -179), 20d), // should end up in NW
+//      (Location(60d, 10d), 30d), // should end up in NE
+//      (Location(-60d, -170d), 10d), // should end up in SW
+//      (Location(-60d, 179d), 10d) // should end up in SE
+//    )
+//
+//
+//    def tempsInTileImage(ti: Option[TileImage]): List[(Location, Temperature)] =
+//      tempsApplicableToTile(child(ti), testTemps).toList
+//
+//    assert(tempsInTileImage(ti.NW).length === 1,
+//      f"NW has ${tempsInTileImage(ti.NW)} members of $testTemps" ++
+//        f" with child: ${child(ti.NW).location} and bottom ${child(ti.NW).bottomRight}")
+//    assert(tempsInTileImage(ti.NE).length === 1,
+//      f"NE has ${tempsInTileImage(ti.NE)} members of $testTemps" ++
+//        f" with child: ${child(ti.NE).location} and bottom ${child(ti.NE).bottomRight}")
+//    assert(tempsInTileImage(ti.SW).length === 1,
+//      f"SW has ${tempsInTileImage(ti.SW)} members for $testTemps" ++
+//        f" with child: ${child(ti.SW).location} and bottom ${child(ti.SW).bottomRight}")
+//    assert(tempsInTileImage(ti.SE).length === 1,
+//      f"SE has ${tempsInTileImage(ti.SE)} members for $testTemps" ++
+//    f" with child: ${child(ti.SE).location} and bottom ${child(ti.SE).bottomRight}")
+//  }
 
-    val testTemps = List[(Location, Temperature)](
-      (Location(80d, -179), 20d), // should end up in NW
-      (Location(60d, 10d), 30d), // should end up in NE
-      (Location(-60d, -170d), 10d), // should end up in SW
-      (Location(-60d, 179d), 10d) // should end up in SE
-    )
-
-
-    def tempsInTileImage(ti: Option[TileImage]): List[(Location, Temperature)] =
-      tempsApplicableToTile(child(ti), testTemps).toList
-
-    assert(tempsInTileImage(ti.NW).length === 1,
-      f"NW has ${tempsInTileImage(ti.NW)} members of $testTemps" ++
-        f" with child: ${child(ti.NW).location} and bottom ${child(ti.NW).bottomRight}")
-    assert(tempsInTileImage(ti.NE).length === 1,
-      f"NE has ${tempsInTileImage(ti.NE)} members of $testTemps" ++
-        f" with child: ${child(ti.NE).location} and bottom ${child(ti.NE).bottomRight}")
-    assert(tempsInTileImage(ti.SW).length === 1,
-      f"SW has ${tempsInTileImage(ti.SW)} members for $testTemps" ++
-        f" with child: ${child(ti.SW).location} and bottom ${child(ti.SW).bottomRight}")
-    assert(tempsInTileImage(ti.SE).length === 1,
-      f"SE has ${tempsInTileImage(ti.SE)} members for $testTemps" ++
-    f" with child: ${child(ti.SE).location} and bottom ${child(ti.SE).bottomRight}")
-  }
-
-  test("Test whether insert into zoom 1 tree works with edge cases") {
-    val ti = TileImage(Tile(0, 0, 0)).grow(1)
-
-    val testTemps = List[(Location, Temperature)](
-      (Tile(0,0, 1).location, 20d), // should end up in NW
-      (Tile(1, 0, 1).location, 30d), // should end up in NE
-      (Tile(0, 1, 1).location, 10d), // should end up in SE
-      (Tile(1, 1, 1).location, 10d) // should end up in SW
-    )
-
-    def tempsInTileImage(ti: Option[TileImage]): List[(Location, Temperature)] =
-      tempsApplicableToTile(child(ti), testTemps).toList
-
-
-    def testLengthTemps(name: String, c: Option[TileImage]): Unit = {
-      assert(tempsInTileImage(c).length === 1,
-        f"$name has ${tempsInTileImage(c)} members of $testTemps")
-    }
-
-    testLengthTemps("NW", ti.NW)
-    testLengthTemps("NE", ti.NE)
-    testLengthTemps("SW", ti.SW)
-    testLengthTemps("SE", ti.SE)
-  }
 
 //  test("Test whether pixels in image map to proper Lat Lon") {
 //    val pixelTestGen = for {
