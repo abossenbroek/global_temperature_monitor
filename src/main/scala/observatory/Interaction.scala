@@ -175,11 +175,19 @@ object Interaction {
       else (NW, NE, SW, SE) match {
         case (Some(nw), Some(ne), Some(sw), Some(se)) =>
           val tiles = List(nw, ne, sw, se)
-          tiles.foreach { ti =>
+          tiles.map { ti =>
             val res = ti.getTileImage(target)
-            if (res.nonEmpty) res
+              if (res.getOrElse(rootTileImage).t == target) {
+                res
+              } else None
+          }.filter(_.isDefined) match {
+            case a :: Nil => a
+            case Nil => None
           }
-          None
+//          found.filter(_.isDefined) match {
+//            case a :: Nil => a
+//            case Nil => None
+//          }
         case (_, _, _, _) =>
           None
       }

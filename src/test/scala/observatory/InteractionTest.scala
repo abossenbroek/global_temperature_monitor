@@ -230,6 +230,12 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     val resZoom0 = latLonPixel(Location(-85.0511, 180), 0)
     assert(resZoom0._1.equals((0, 0)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._1}")
     assert(resZoom0._2.equals((255, 255)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom0._2}")
+
+    val resZoom2 = latLonPixel(Location(-85.0511, 180), 2)
+    assert(resZoom2._1.equals((3, 3)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom2._1}")
+    assert(resZoom2._2.equals((255, 255)), s"At zoom level 0, -85, 180 should be in tile 0, not ${resZoom2._2}")
+
+
   }
 
   test("Tests consistency of generated images 1") {
@@ -256,13 +262,23 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     val testColor0 = imgTileZoomLevel0.argb(coordsZoomLevel0._2._1, coordsZoomLevel0._2._2)
     val coordsZoomLevel1 = latLonPixel(testLocation, 1)
     val imgTileZoomLevel1 = tile(temps, colScheme, Tile(coordsZoomLevel1._1._1, coordsZoomLevel1._1._2, 1))
-    assert(coordsZoomLevel1._2._1 < imgTileZoomLevel1.width, s"${coordsZoomLevel1._2._1} doesn't fit in width")
-    assert(coordsZoomLevel1._2._2 < imgTileZoomLevel1.height,s"${coordsZoomLevel1._2._2} doesn't fit in height" )
 
     val testColor1 = imgTileZoomLevel1.argb(coordsZoomLevel1._2._1, coordsZoomLevel1._2._2)
 
     assert(testColor0 === testColor1,
       s"Colors should be same at level 0 ($coordsZoomLevel0) and 1 ($coordsZoomLevel1)")
+
+    val coordsZoomLevel2 = latLonPixel(testLocation, 2)
+    val imgTileZoomLevel2 = tile(temps, colScheme, Tile(coordsZoomLevel2._1._1, coordsZoomLevel2._1._2, 2))
+    assert(coordsZoomLevel2._1._1 <= imgTileZoomLevel2.width,
+      s"${coordsZoomLevel2._1._1} should fit in ${imgTileZoomLevel2.width}")
+    assert(coordsZoomLevel2._1._2 <= imgTileZoomLevel2.height,
+      s"${coordsZoomLevel2._1._2} should fit in ${imgTileZoomLevel2.height}")
+
+    val testColor2 = imgTileZoomLevel2.argb(coordsZoomLevel2._2._1, coordsZoomLevel2._2._2)
+
+    assert(testColor0 === testColor2,
+      s"At level 0 ($coordsZoomLevel0) and 2 ($coordsZoomLevel2), found respectively $testColor0 and $testColor2")
   }
 
   //  test("Test whether new TileImage with applicable temperatures works") {
