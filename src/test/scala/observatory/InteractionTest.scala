@@ -10,9 +10,57 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 
   import Interaction._
 
-  test("Test boolean operators of Location") {
-    assert(Location(85, -180) > Location(-85, 180), "Location(85, -180) > Location(-85, 180) should hold")
-    assert(Location(-85, 180) < Location(85, -180), "Location(-85, 180) < Location(85, -180) should hold")
+  val genTilePairs: Gen[(Tile, Tile)] = for {
+    zoomLevel <- Gen.choose(1,7)
+    dim = (1 << zoomLevel)
+    x0 <- Gen.choose(0, (dim - 2))
+    y0 <- Gen.choose(0, (dim - 2))
+    x1 <- Gen.choose(x0 + 1, dim - 1)
+    y1 <- Gen.choose(y0 + 1, dim - 1)
+  } yield (Tile(x0, y0, zoomLevel), Tile(x1, y1, zoomLevel))
+
+  test("Test for consistent latMap") {
+    val genTile = for {
+      zoomLevel <- Gen.choose(1,7)
+      dim = (1 << zoomLevel)
+      x <- Gen.choose(0, dim - 1)
+      y <- Gen.choose(0, dim - 1)
+    } yield (Tile(x, y, zoomLevel))
+
+    check{
+      forAll(genTile) {
+        t => t.latMap.forall(x => -85.06 < x && x < 85.06)
+      }
+    }
+
+    check {
+      forAll(genTilePairs) {
+        case (tile0, tile1) =>
+          tile0.latMap.forall(_ > tile1.latMap.max)
+      }
+    }
+  }
+
+  test("Test for consistent lonMap") {
+    val genTile = for {
+      zoomLevel <- Gen.choose(1,7)
+      dim = (1 << zoomLevel)
+      x <- Gen.choose(0, dim - 1)
+      y <- Gen.choose(0, dim - 1)
+    } yield (Tile(x, y, zoomLevel))
+
+    check{
+      forAll(genTile) {
+        t => t.latMap.forall(x => -180 < x && x < 180)
+      }
+    }
+
+    check {
+      forAll(genTilePairs) {
+        case (tile0, tile1) =>
+          tile0.lonMap.forall(_ < tile1.lonMap.min)
+      }
+    }
   }
 
 
@@ -107,7 +155,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     val baseTile = Tile(0, 0, 0)
     val origImage = tile(temps, colScheme, baseTile)
 
-    val property = {
+    check {
       val zoomLevel = Gen.choose(1, 7)
       val lat = Gen.choose(-85.0511, 85.0511)
       val lon = Gen.choose(-180.0, 180.0)
@@ -121,8 +169,6 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
         origImage.argb(coordOrig._1, coordOrig._2) === destImage.argb(coordDest._1, coordDest._2)
       }
     }
-
-    check(property)
   }
 //    consistentZoom.check
 //

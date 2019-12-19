@@ -54,21 +54,9 @@ object Interaction {
     println(f"### tile: called with temperatures $temperatures")
     println(f"### tile: called with color-scheme $colors")
     println(f"### tile: called with tile $tile ")
-    val bottomRight: Location = Tile(tile.x + 1, tile.y + 1, tile.zoom).location
-    val tileLatRange = tile.location.lat - bottomRight.lat
-    val tileLonRange = -(tile.location.lon - bottomRight.lon)
-    val latIdx = tileLatRange / tileWidth
-    val lonIdx = tileLonRange / tileWidth
-    val latMap = (0 until tileWidth.toInt).map { i =>
-      tile.location.lat - latIdx * i
-    }
-    val lonMap = (0 until tileWidth.toInt).map { i =>
-      tile.location.lon + lonIdx * i
-    }
-    val tileCoords = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
 
     val tempScale = calculateScale(colors)
-    val imgArray = tileCoords.map{c : (Double, Double) =>
+    val imgArray = tile.tileCoords.map{c : (Double, Double) =>
       val currentTemp = predictTemperature(temperatures, Location(c._1, c._2))
       val col = interpolateColorWithScale(tempScale, currentTemp)
       Pixel(PixelTools.argb(alpha, col.red, col.green, col.blue))

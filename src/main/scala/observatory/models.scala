@@ -1,5 +1,7 @@
 package observatory
 
+import observatory.Interaction.tileWidth
+
 /**
   * Introduced in Week 1. Represents a location on the globe.
   *
@@ -34,20 +36,19 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
     x.toDouble / numTiles * 360d - 180d)
 
-  private lazy val newNorth = y * 2
-  private lazy val newSouth = y * 2 + 1
-  private lazy val newWest = x * 2
-  private lazy val newEast = x * 2 + 1
-  lazy val NW = Tile(newNorth, newWest, zoom + 1)
-  lazy val NE = Tile(newNorth, newEast, zoom + 1)
-  lazy val SW = Tile(newSouth, newWest, zoom + 1)
-  lazy val SE = Tile(newSouth, newEast, zoom + 1)
+  private lazy val bottomRight: Location = Tile(x + 1, y + 1, zoom).location
+  private lazy val tileLatRange = location.lat - bottomRight.lat
+  private lazy val tileLonRange = -(location.lon - bottomRight.lon)
+  private lazy val latIdx = tileLatRange / tileWidth
+  private lazy val lonIdx = tileLonRange / tileWidth
+  lazy val latMap = (0 until tileWidth.toInt).map { i =>
+    location.lat - latIdx * i
+  }
+  lazy val lonMap = (0 until tileWidth.toInt).map { i =>
+    location.lon + lonIdx * i
+  }
+  lazy val tileCoords = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
 
-//  def fromPixelToLocation(pixel: (Int, Int)): Location =
-//    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
-//      pixel._1.toDouble / imgSize.toDouble * 360d - 180d)
-
-  // TODO: consider refactoring image conversion to here
 }
 
 /**
