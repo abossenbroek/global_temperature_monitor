@@ -67,8 +67,8 @@ object Interaction {
       Pixel(PixelTools.argb(alpha, col.red, col.green, col.blue))
     }.toArray
 
-    val img = Image(tileWidth.toInt, tileWidth.toInt, imgArray)
-    img.scaleTo(targetSquareDim, targetSquareDim, FastScale)
+    Image(tile.tileSize, tile.tileSize, imgArray)
+//    img.scaleTo(targetSquareDim, targetSquareDim, FastScale)
   }
 
 

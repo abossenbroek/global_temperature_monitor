@@ -19,14 +19,14 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     y1 <- Gen.choose(y0 + 1, dim - 1)
   } yield (Tile(x0, y0, zoomLevel), Tile(x1, y1, zoomLevel))
 
-  test("Test for consistent latMap") {
-    val genTile = for {
-      zoomLevel <- Gen.choose(1,7)
-      dim = (1 << zoomLevel)
-      x <- Gen.choose(0, dim - 1)
-      y <- Gen.choose(0, dim - 1)
-    } yield (Tile(x, y, zoomLevel))
+  val genTile = for {
+    zoomLevel <- Gen.choose(1,7)
+    dim = (1 << zoomLevel)
+    x <- Gen.choose(0, dim - 1)
+    y <- Gen.choose(0, dim - 1)
+  } yield (Tile(x, y, zoomLevel))
 
+  test("Test for consistent latMap") {
     check{
       forAll(genTile) {
         t => t.latMap.forall(x => -85.06 < x && x < 85.06)
@@ -42,13 +42,6 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
   }
 
   test("Test for consistent lonMap") {
-    val genTile = for {
-      zoomLevel <- Gen.choose(1,7)
-      dim = (1 << zoomLevel)
-      x <- Gen.choose(0, dim - 1)
-      y <- Gen.choose(0, dim - 1)
-    } yield (Tile(x, y, zoomLevel))
-
     check{
       forAll(genTile) {
         t => t.latMap.forall(x => -180 < x && x < 180)
@@ -88,62 +81,27 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
   //    testDim(Tile(7, 7, 3))
   //  }
 
+  test("Perform property testing to ensure image correctness across zoom levels") {
+    val temps = Array(
+      (Location(45.0, -90.0), -10.0),
+      (Location(45.0, 90.0), 0.0),
+      (Location(0.0, 0.0), 10.0),
+      (Location(-45.0, -90.0), 30.0),
+      (Location(-45.0, 90.0), 20.0))
+    val colScheme = List(
+      (-10.0, Color(128, 128, 128)),
+      (0.0, Color(255, 0, 0)),
+      (10.0, Color(0, 255, 0)),
+      (20.0, Color(0, 0, 255)),
+      (30.0, Color(255, 0, 255)))
 
-  test("Test latLonPixel function") {
-    def testLatLonPixel(l: Location, t: Tile, c: (Int, Int)): Unit = {
-      val res = latLon2TilePixel(l, t.zoom)
-      assert(res._1 === t, s"At ${t.zoom}: $l should be in tile $t not ${res._1}")
-      assert(res._2.equals(c), s"At ${t.zoom}: $l should by at coordinate $c not ${res._2}")
+    check {
+      forAll(genTile) { t =>
+        val img = tile(temps, colScheme, t)
+        img.width === 256 & img.height === 256
+      }
     }
 
-    testLatLonPixel(Location(-85.0511, 180), Tile(0, 0, 0), (255, 255))
-    testLatLonPixel(Location(-85.0511, 180), Tile(3, 3, 2), (255, 255))
-    testLatLonPixel(Location(85.0511, -180), Tile(0, 0, 2), (0, 0))
-    testLatLonPixel(Location(0, 0), Tile(1, 1, 2), (255, 255))
-    testLatLonPixel(Location(0, 0), Tile(0, 0, 1), (255, 255))
-  }
-
-  //  test("Tests consistency of generated images 1") {
-  //    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
-  //    val colScheme = List((10.0,Color(255,0,0)), (20.0,Color(0,0,255)))
-  //
-  //    val imgTile000 = tile(temps, colScheme, Tile(0, 0, 0))
-  //    val imgTile001 = tile(temps, colScheme, Tile(0, 0, 1))
-  //    val imgTile773 = tile(temps, colScheme, Tile(7, 7, 3))
-  //
-  //    imgTile000.output(new java.io.File("target/imgTile1_000.png"))
-  //    imgTile001.output(new java.io.File("target/imgTile1_001.png"))
-  //    imgTile773.output(new java.io.File("target/imgTile1_773.png"))
-  //  }
-  //
-  test("Tests consistency of generated images 2") {
-    val temps = Array((Location(45.0, -90.0), 20.0), (Location(45.0, 90.0), 0.0), (Location(0.0, 0.0), 10.0),
-      (Location(-45.0, -90.0), 0.0), (Location(-45.0, 90.0), 20.0))
-    val colScheme = List((0.0, Color(255, 0, 0)), (10.0, Color(0, 255, 0)), (20.0, Color(0, 0, 255)))
-    val testLocation = Location(-27.059125784374057, -180.0)
-    val coordsZoomLevel0 = latLon2TilePixel(testLocation, 0)
-
-    val imgTileZoomLevel0 = tile(temps, colScheme, Tile(0, 0, 0))
-    val testColor0 = imgTileZoomLevel0.argb(coordsZoomLevel0._2._1, coordsZoomLevel0._2._2)
-    val coordsZoomLevel1 = latLon2TilePixel(testLocation, 1)
-    val imgTileZoomLevel1 = tile(temps, colScheme, coordsZoomLevel1._1)
-
-    val testColor1 = imgTileZoomLevel1.argb(coordsZoomLevel1._2._1, coordsZoomLevel1._2._2)
-
-    assert(testColor0 === testColor1,
-      s"Colors should be same at level 0 ($coordsZoomLevel0) and 1 ($coordsZoomLevel1)")
-
-    val coordsZoomLevel2 = latLon2TilePixel(testLocation, 2)
-    val imgTileZoomLevel2 = tile(temps, colScheme, coordsZoomLevel2._1)
-    assert(coordsZoomLevel2._2._1 <= imgTileZoomLevel2.width,
-      s"${coordsZoomLevel2._2._1} should fit in ${imgTileZoomLevel2.width}")
-    assert(coordsZoomLevel2._2._2 <= imgTileZoomLevel2.height,
-      s"${coordsZoomLevel2._2._2} should fit in ${imgTileZoomLevel2.height}")
-
-    val testColor2 = imgTileZoomLevel2.argb(coordsZoomLevel2._2._1, coordsZoomLevel2._2._2)
-
-    assert(testColor0 === testColor2,
-      s"At level 0 ($coordsZoomLevel0) and 2 ($coordsZoomLevel2), found respectively $testColor0 and $testColor2")
   }
 
   test("Perform property testing to ensure consistency across zoom levels") {
