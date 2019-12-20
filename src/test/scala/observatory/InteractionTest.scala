@@ -63,6 +63,13 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     }
   }
 
+  test("Whether Chicago at different zoom levels is properly located") {
+    val chicagoLoc = Location(41.85, -87.65)
+    val res2 = latLonPixel(chicagoLoc, 2)
+    assert(res2._1 === Tile(1, 1, 2))
+    assert(res2._2.equals((131, 190)), s"${res2._2} does not equal (131, 190)")
+  }
+
 
   //  test("Tests image size") {
   //    val temps = List((Location(45.0,-90.0),10.0), (Location(-45.0,0.0),20.0))
