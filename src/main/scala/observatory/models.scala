@@ -41,13 +41,13 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   private lazy val tileLonRange = -(location.lon - bottomRight.lon)
   private lazy val latIdx = tileLatRange / tileWidth
   private lazy val lonIdx = tileLonRange / tileWidth
-  lazy val latMap = (0 until tileWidth.toInt).map { i =>
+  lazy val latMap : Seq[Double] = (0 until tileWidth.toInt).map { i =>
     location.lat - latIdx * i
   }
-  lazy val lonMap = (0 until tileWidth.toInt).map { i =>
+  lazy val lonMap : Seq[Double] = (0 until tileWidth.toInt).map { i =>
     location.lon + lonIdx * i
   }
-  lazy val tileCoords = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
+  lazy val tileCoords : Seq[(Double, Double)] = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
 
 }
 
