@@ -12,10 +12,11 @@ object Main extends App {
 //object Main extends App {
   val cacheFileName = "temp.tmp"
   val generateTemp = new java.io.File(cacheFileName).exists
-  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
+  println(s"Cache file $cacheFileName was found: $generateTemp")
+
   val forkJoinPool = new java.util.concurrent.ForkJoinPool(6)
 
-  if (generateTemp) {
+  if (!generateTemp) {
 //    logger.info("Loading data")
     val temp1989 = Extraction.locateTemperatures(1989,
       "/stations.csv",
@@ -33,11 +34,11 @@ object Main extends App {
     oos.close()
   }
 
-  val fis = new FileInputStream(cacheFileName)
-  val ois = new ObjectInputStream(fis)
-  val temps = ois.readObject().asInstanceOf[Iterable[(Location, Temperature)]]
-
-  println(temps.take(10))
+//  val fis = new FileInputStream(cacheFileName)
+//  val ois = new ObjectInputStream(fis)
+//  val temps = ois.readObject().asInstanceOf[Iterable[(Location, Temperature)]]
+//
+//  println(temps.take(10))
 
 ////  logger.info(s"Visualization using ${temps.toSeq.length}")
 ////  val time = config(
@@ -52,7 +53,26 @@ object Main extends App {
 ////  }
 ////
 ////  println(s"Total time: $time")
-  generateTiles(List((1989, temps.take(10))), tileSave)
+//  generateTiles(List((1989, temps.take(10))), tileSave)
+
+  val t = Tile(0, 0, 0)
+  println(s"latmap ${t.latMap}")
+  println(s"lonmap ${t.lonMap}")
+
+//  val t1 = Tile(2, 5, 3)
+//  val t2 = Tile(3, 6, 3)
+//  println(s"latMap $t1 \t: ${t1.latMap}")
+//  println(s"latMap $t2 \t: ${t2.latMap}")
+//
+//  val t3 = Tile(1, 2, 2)
+//  val t4 = Tile(2, 3, 2)
+//  println(s"lonMap $t3 \t: ${t1.lonMap}")
+//  println(s"lonMap $t4 \t: ${t2.lonMap}")
+
+  (0 until 8).map { x =>
+    val t = Tile(x, 0, 3)
+    println(s"for $t\t\t latMap: ${t.lonMap}")
+  }
 
   forkJoinPool.shutdown()
 }
