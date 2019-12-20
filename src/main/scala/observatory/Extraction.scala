@@ -4,6 +4,7 @@ import java.nio.file.Paths
 import java.sql.Date
 import java.time.LocalDate
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.ScalaReflection
 import org.apache.spark.sql.types._
@@ -16,6 +17,7 @@ import scala.reflect.runtime.universe.TypeTag
 object Extraction {
 
   import org.apache.spark.sql.SparkSession
+  Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
 
   val spark: SparkSession =
     SparkSession

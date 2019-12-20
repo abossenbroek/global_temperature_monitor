@@ -11,6 +11,15 @@ import scala.collection.immutable.TreeMap
   */
 //object Visualization extends LazyLogging {
 object Visualization {
+  val colorScale = List((-60d, Color(0, 0, 0)),
+    (-50d, Color(33, 0, 107)),
+    (-27d, Color(255, 0, 255)),
+    (-15d, Color(0, 0, 255)),
+    (0d, Color(0, 255, 255)),
+    (12d, Color(255, 255, 0)),
+    (32d, Color(255, 0, 0)),
+    (60d, Color(255, 255, 255)))
+
   /**
     * @param temperatures Known temperatures: pairs containing a location and the temperature at this location
     * @param location Location where to predict the temperature
@@ -137,7 +146,8 @@ object Visualization {
     * @param colors Color scale
     * @return A 360×180 image where each pixel shows the predicted temperature at its location
     */
-  def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]): Image = {
+  def visualize(temperatures: Iterable[(Location, Temperature)], colors: Iterable[(Temperature, Color)]):
+  Image = {
 
     // All performance checks on 500 locations:
     // BASE START:                            Total time: 6089.689545249999 ms

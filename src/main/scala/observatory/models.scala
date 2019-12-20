@@ -1,18 +1,15 @@
 package observatory
 
+import observatory.Interaction.tileWidth
+
 /**
   * Introduced in Week 1. Represents a location on the globe.
   *
   * @param lat Degrees of latitude, -90 ≤ lat ≤ 90
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
-case class Location(lat: Double, lon: Double) {
-  def <~=(that: Location): Boolean = (this < that) || (this ~= that)
-  def <(that: Location): Boolean = lat < that.lat && lon > that.lon
-  def >(that: Location): Boolean = lat > that.lat && lon < that.lon
-  def >~=(that: Location): Boolean = (this > that) || (this ~= that)
-  def ~=(that: Location): Boolean = math.abs(lat - that.lat) < 1e-3 && math.abs(lon - that.lon) < 1e-3
-}
+case class Location(lat: Double, lon: Double)
+
 
 object GlobalCoordinates {
   val TopLeft = Location(85.0511, -180)
@@ -34,20 +31,16 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
     x.toDouble / numTiles * 360d - 180d)
 
-  private lazy val newNorth = y * 2
-  private lazy val newSouth = y * 2 + 1
-  private lazy val newWest = x * 2
-  private lazy val newEast = x * 2 + 1
-  lazy val NW = Tile(newNorth, newWest, zoom + 1)
-  lazy val NE = Tile(newNorth, newEast, zoom + 1)
-  lazy val SW = Tile(newSouth, newWest, zoom + 1)
-  lazy val SE = Tile(newSouth, newEast, zoom + 1)
+  lazy val pixelZoomLevel = zoom + 8
 
-//  def fromPixelToLocation(pixel: (Int, Int)): Location =
-//    Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * pixel._2.toDouble / imgSize.toDouble)))),
-//      pixel._1.toDouble / imgSize.toDouble * 360d - 180d)
+  lazy val latMap : Seq[Double] = (0 until tileSize).map { i =>
+    Tile(0, 256 * y + i, pixelZoomLevel).location.lat
+  }
+  lazy val lonMap : Seq[Double] = (0 until tileSize).map { i =>
+    Tile(256 * x + i, 0, pixelZoomLevel).location.lon
+  }
+  lazy val tileCoords : Seq[(Double, Double)] = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
 
-  // TODO: consider refactoring image conversion to here
 }
 
 /**
