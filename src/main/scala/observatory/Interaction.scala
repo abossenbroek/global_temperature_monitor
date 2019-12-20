@@ -26,22 +26,27 @@ object Interaction {
     tile.location
   }
 
-  def latLonPixel(l: Location, z: Int): (Tile, (Int, Int)) = {
-    val coordSize: Int = (math.max(1, 1 << z) * Tile(0, 0, 0).tileSize - 1)
-    val y = ((l.lat - GlobalCoordinates.TopLeft.lat) /
-      -(GlobalCoordinates.TopLeft.lat - GlobalCoordinates.BottomRight.lat) * coordSize).toInt
-    val x = ((l.lon + GlobalCoordinates.BottomRight.lon) /
-      (-GlobalCoordinates.TopLeft.lon + GlobalCoordinates.BottomRight.lon) * coordSize).toInt
+  def latLon2TilePixel(l: Location, z: Int): (Tile, (Int, Int)) = {
+    val tileSize = Tile(0, 0, 0).tileSize
+    val (x,y) = project(l)
+    val increment = (1 << z).toInt
+    val globalScale = tileSize * increment
 
-
-    val tileX = x / Tile(0, 0, 0).tileSize
-    val tileY = y / Tile(0, 0, 0).tileSize
-    val inTileX = x % Tile(0, 0, 0).tileSize
-    val inTileY = y % Tile(0, 0, 0).tileSize
+    val tileX = (x * globalScale).toInt / tileSize
+    val tileY = (y * globalScale).toInt / tileSize
+    val inTileX = (x * globalScale).toInt % tileSize
+    val inTileY = (y * globalScale).toInt % tileSize
 
     (Tile(tileX, tileY, zoom = z), (inTileX, inTileY))
   }
 
+  def project(l: Location): (Double, Double) = {
+    val siny = math.sin(l.lat * math.Pi / 180d)
+    val boundedSiny = math.min(math.max(siny, -0.9999), 0.9999)
+    val globalX = (0.5 + l.lon / 360)
+    val globalY = (0.5 - math.log((1 + boundedSiny) / (1 - boundedSiny)) / (4 * math.Pi))
+    (globalX, globalY)
+  }
 
   /**
     * @param temperatures Known temperatures
