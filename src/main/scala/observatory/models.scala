@@ -8,13 +8,8 @@ import observatory.Interaction.tileWidth
   * @param lat Degrees of latitude, -90 ≤ lat ≤ 90
   * @param lon Degrees of longitude, -180 ≤ lon ≤ 180
   */
-case class Location(lat: Double, lon: Double) {
-  def <~=(that: Location): Boolean = (this < that) || (this ~= that)
-  def <(that: Location): Boolean = lat < that.lat && lon > that.lon
-  def >(that: Location): Boolean = lat > that.lat && lon < that.lon
-  def >~=(that: Location): Boolean = (this > that) || (this ~= that)
-  def ~=(that: Location): Boolean = math.abs(lat - that.lat) < 1e-3 && math.abs(lon - that.lon) < 1e-3
-}
+case class Location(lat: Double, lon: Double)
+
 
 object GlobalCoordinates {
   val TopLeft = Location(85.0511, -180)
@@ -36,16 +31,13 @@ case class Tile(x: Int, y: Int, zoom: Int) {
   lazy val location: Location = Location(math.toDegrees(math.atan(math.sinh(math.Pi * (1d - 2d * y / numTiles)))),
     x.toDouble / numTiles * 360d - 180d)
 
-  private lazy val bottomRight: Location = Tile(x + 1, y + 1, zoom).location
-  private lazy val tileLatRange = location.lat - bottomRight.lat
-  private lazy val tileLonRange = -(location.lon - bottomRight.lon)
-  private lazy val latIdx = tileLatRange / tileWidth
-  private lazy val lonIdx = tileLonRange / tileWidth
-  lazy val latMap : Seq[Double] = (0 until tileWidth.toInt).map { i =>
-    location.lat - latIdx * i
+  lazy val pixelZoomLevel = zoom + 8
+
+  lazy val latMap : Seq[Double] = (0 until tileSize).map { i =>
+    Tile(0, 256 * y + i, pixelZoomLevel).location.lat
   }
-  lazy val lonMap : Seq[Double] = (0 until tileWidth.toInt).map { i =>
-    location.lon + lonIdx * i
+  lazy val lonMap : Seq[Double] = (0 until tileSize).map { i =>
+    Tile(256 * x + i, 0, pixelZoomLevel).location.lon
   }
   lazy val tileCoords : Seq[(Double, Double)] = for (lat <- latMap ; lon <- lonMap) yield (lat, lon)
 

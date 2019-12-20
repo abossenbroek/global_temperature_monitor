@@ -65,10 +65,11 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 
   test("Whether Chicago at different zoom levels is properly located") {
     val chicagoLoc = Location(41.85, -87.65)
-    val res2 = latLonPixel(chicagoLoc, 2)
+    val res2 = latLon2TilePixel(chicagoLoc, 2)
     assert(res2._1 === Tile(1, 1, 2))
     assert(res2._2.equals((131, 190)), s"${res2._2} does not equal (131, 190)")
   }
+
 
 
   //  test("Tests image size") {
@@ -90,7 +91,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 
   test("Test latLonPixel function") {
     def testLatLonPixel(l: Location, t: Tile, c: (Int, Int)): Unit = {
-      val res = latLonPixel(l, t.zoom)
+      val res = latLon2TilePixel(l, t.zoom)
       assert(res._1 === t, s"At ${t.zoom}: $l should be in tile $t not ${res._1}")
       assert(res._2.equals(c), s"At ${t.zoom}: $l should by at coordinate $c not ${res._2}")
     }
@@ -120,11 +121,11 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
       (Location(-45.0, -90.0), 0.0), (Location(-45.0, 90.0), 20.0))
     val colScheme = List((0.0, Color(255, 0, 0)), (10.0, Color(0, 255, 0)), (20.0, Color(0, 0, 255)))
     val testLocation = Location(-27.059125784374057, -180.0)
-    val coordsZoomLevel0 = latLonPixel(testLocation, 0)
+    val coordsZoomLevel0 = latLon2TilePixel(testLocation, 0)
 
     val imgTileZoomLevel0 = tile(temps, colScheme, Tile(0, 0, 0))
     val testColor0 = imgTileZoomLevel0.argb(coordsZoomLevel0._2._1, coordsZoomLevel0._2._2)
-    val coordsZoomLevel1 = latLonPixel(testLocation, 1)
+    val coordsZoomLevel1 = latLon2TilePixel(testLocation, 1)
     val imgTileZoomLevel1 = tile(temps, colScheme, coordsZoomLevel1._1)
 
     val testColor1 = imgTileZoomLevel1.argb(coordsZoomLevel1._2._1, coordsZoomLevel1._2._2)
@@ -132,7 +133,7 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
     assert(testColor0 === testColor1,
       s"Colors should be same at level 0 ($coordsZoomLevel0) and 1 ($coordsZoomLevel1)")
 
-    val coordsZoomLevel2 = latLonPixel(testLocation, 2)
+    val coordsZoomLevel2 = latLon2TilePixel(testLocation, 2)
     val imgTileZoomLevel2 = tile(temps, colScheme, coordsZoomLevel2._1)
     assert(coordsZoomLevel2._2._1 <= imgTileZoomLevel2.width,
       s"${coordsZoomLevel2._2._1} should fit in ${imgTileZoomLevel2.width}")
@@ -170,8 +171,8 @@ trait InteractionTest extends FunSuite with Checkers with Matchers {
 
       forAll(zoomLevel, lat, lon) { (dstZoom, testLat, testLon) =>
         val testLocation = Location(testLat, testLon)
-        val (_, coordOrig) = latLonPixel(testLocation, 0)
-        val (tileDest, coordDest) = latLonPixel(testLocation, dstZoom)
+        val (_, coordOrig) = latLon2TilePixel(testLocation, 0)
+        val (tileDest, coordDest) = latLon2TilePixel(testLocation, dstZoom)
         val destImage = tile(temps, colScheme, tileDest)
         origImage.argb(coordOrig._1, coordOrig._2) === destImage.argb(coordDest._1, coordDest._2)
       }
